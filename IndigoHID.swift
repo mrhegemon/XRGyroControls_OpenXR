@@ -13,7 +13,7 @@ class IndigoHIDMessage {
     public var data: [UInt8] = []
     
     public func as_struct() -> UnsafeMutablePointer<IndigoHIDMessageStruct> {
-        print("data: \(data)")
+        //print("data: \(data)")
         // Make sure that the backing data is the correct size
         guard data.count == MemoryLayout<IndigoHIDMessageStruct>.size else {
             fatalError("IndigoHIDMessage backing data is not the correct size")
