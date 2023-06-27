@@ -9,9 +9,10 @@ typedef struct openxr_headset_data
   float y;
   float z;
 
-  float pitch;
-  float yaw;
-  float roll;
+  float qx;
+  float qy;
+  float qz;
+  float qw;
 } openxr_headset_data;
 
 int openxr_main();

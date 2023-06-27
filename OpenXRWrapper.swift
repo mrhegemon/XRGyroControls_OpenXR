@@ -28,7 +28,7 @@ import Foundation
     }
 
     @objc func get_data() -> openxr_headset_data {
-        var data = openxr_headset_data(x: 0.0, y: 0.0, z: 0.0, pitch: 0.0, yaw: 0.0, roll: 0.0);
+        var data = openxr_headset_data(x: 0.0, y: 0.0, z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 0.0);
 
         openxr_headset_get_data(&data);
 

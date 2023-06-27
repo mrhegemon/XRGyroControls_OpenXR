@@ -73,6 +73,8 @@ public:
 private:
   bool valid = true;
   bool exitRequested = false;
+  bool left_hand_valid = false;
+  bool right_hand_valid = false;
 
   const Context* context = nullptr;
 

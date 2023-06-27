@@ -165,13 +165,15 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 {
   if (!headset) return;
 
-  const XrView& eyePose = headset->eyePoses.at(0);
+  const XrView& eyePose0 = headset->eyePoses.at(0);
+  const XrView& eyePose1 = headset->eyePoses.at(1);
 
-  out->x = eyePose.pose.position.x;
-  out->y = eyePose.pose.position.y;
-  out->z = eyePose.pose.position.z;
+  out->x = (eyePose0.pose.position.x + eyePose1.pose.position.x) / 2.0;
+  out->y = (eyePose0.pose.position.y + eyePose1.pose.position.y) / 2.0;
+  out->z = (eyePose0.pose.position.z + eyePose1.pose.position.z) / 2.0;
 
-  out->pitch = eyePose.pose.orientation.x;
-  out->yaw = eyePose.pose.orientation.y;
-  out->roll = eyePose.pose.orientation.z;
+  out->qx = eyePose0.pose.orientation.x;
+  out->qy = eyePose0.pose.orientation.y;
+  out->qz = eyePose0.pose.orientation.z;
+  out->qw = eyePose0.pose.orientation.w;
 }
