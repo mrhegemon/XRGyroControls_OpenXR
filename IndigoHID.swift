@@ -110,7 +110,7 @@ class IndigoHIDMessage {
     // 302 - raycast?
 
     public func pose(x: Float, y: Float, z: Float, qx: Float, qy: Float, qz: Float, qw: Float) {
-        write_int32(50, offset: 0x30)
+        write_int32(300, offset: 0x30)
         /*test += 1
         if (test > 310) {
             test = 0

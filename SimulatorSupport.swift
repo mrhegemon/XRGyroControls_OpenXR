@@ -19,27 +19,9 @@ import os
         os_log("XRGyroControls: Initialized HID client")
         super.init()
 
-        //let thread = MyThread(self.openxr_wrapper)
-        //thread.start()
-
-        //Thread.detachNewThreadSelector(#selector(openxr_thread), toTarget: self, with: 1)
-        /*DispatchQueue.main.async { 
-          self.openxr_thread()
-        }*/
-
         DispatchQueue.global().async {
             self.openxr_thread()
         }
-
-        
-        //var cnt = 0
-        // Schedule a HID message to be sent every 5 seconds
-        //Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { timer in
-        //    cnt += 1
-            //self.send_test_message(cnt)
-            //self.openxr_wrapper.loop()
-        //}
-    
     }
 
     @objc func openxr_thread() {
@@ -53,13 +35,12 @@ import os
             if(self.openxr_wrapper.done()) { break }
 
             let pose = self.openxr_wrapper.get_data()
-
             let message = IndigoHIDMessage()
-            // Should create a very slow rise
-            message.pose(x: pose.x, y: pose.y, z: pose.z, pitch: pose.pitch, yaw: pose.yaw, roll: pose.roll)
+
+            message.pose(x: pose.x, y: pose.y, z: pose.z, qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw)
             hid_client.send(message: message.as_struct())
 
-            Thread.sleep(forTimeInterval: 0.1)
+            Thread.sleep(forTimeInterval: 0.032)
         }
         print("OpenXR thread end!")
         self.openxr_wrapper.cleanup()
@@ -69,7 +50,7 @@ import os
         //os_log("XRGyroControls: Sending HID message")
         let message = IndigoHIDMessage()
         // Should create a very slow rise
-        message.pose(x: 0.0, y: Float(cnt) / 1000, z: 0.0, pitch: 0.0, yaw: 0.0, roll: 0.0)
+        message.pose(x: 0.0, y: Float(cnt) / 1000, z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0)
         hid_client.send(message: message.as_struct())
     }
     
