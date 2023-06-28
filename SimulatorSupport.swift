@@ -28,6 +28,7 @@ import os
         Thread.sleep(forTimeInterval: 1.0)
 
         print("OpenXR thread start!")
+        var asdf: Int = 0
         while (true) {
             DispatchQueue.main.async {
                 self.openxr_wrapper.loop()
@@ -35,23 +36,24 @@ import os
             if(self.openxr_wrapper.done()) { break }
 
             let pose = self.openxr_wrapper.get_data()
-            let message = IndigoHIDMessage()
+            
+            hid_client.send(message: IndigoHIDMessage.pose(pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw).as_struct())
+            hid_client.send(message: IndigoHIDMessage.manipulator(asdf, pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw).as_struct())
 
-            message.pose(x: pose.x, y: pose.y, z: pose.z, qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw)
-            hid_client.send(message: message.as_struct())
+            asdf += 1
+            if (asdf > 255) {
+                asdf = 0
+            }
 
             Thread.sleep(forTimeInterval: 0.032)
+            //Thread.sleep(forTimeInterval: 0.5)
         }
         print("OpenXR thread end!")
         self.openxr_wrapper.cleanup()
     }
     
     func send_test_message(_ cnt: Int) {
-        //os_log("XRGyroControls: Sending HID message")
-        let message = IndigoHIDMessage()
-        // Should create a very slow rise
-        message.pose(x: 0.0, y: Float(cnt) / 1000, z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0)
-        hid_client.send(message: message.as_struct())
+        hid_client.send(message: IndigoHIDMessage.pose(0.0, Float(cnt) / 1000, 0.0, 0.0, 0.0, 0.0, 1.0).as_struct())
     }
     
     @objc func overlayView() -> NSView {
