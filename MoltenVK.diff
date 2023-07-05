@@ -1,0 +1,142 @@
+diff --git a/Common/MVKCommonEnvironment.h b/Common/MVKCommonEnvironment.h
+index c9599223..541ac0d6 100644
+--- a/Common/MVKCommonEnvironment.h
++++ b/Common/MVKCommonEnvironment.h
+@@ -74,7 +74,7 @@ extern "C" {
+ 
+ /** Building for a Simulator. */
+ #ifndef MVK_OS_SIMULATOR
+-#	define MVK_OS_SIMULATOR			TARGET_OS_SIMULATOR
++#	define MVK_OS_SIMULATOR			1
+ #endif
+ 
+ /** Building for Apple Silicon on iOS, tvOS, or macOS platform. */
+diff --git a/Common/MVKOSExtensions.h b/Common/MVKOSExtensions.h
+index ff96991c..e94e2200 100644
+--- a/Common/MVKOSExtensions.h
++++ b/Common/MVKOSExtensions.h
+@@ -44,7 +44,7 @@ inline MVKOSVersion mvkMakeOSVersion(uint32_t major, uint32_t minor, uint32_t pa
+ }
+ 
+ /** Returns whether the operating system version is at least minVer. */
+-inline bool mvkOSVersionIsAtLeast(MVKOSVersion minVer) { return mvkOSVersion() >= minVer; }
++inline bool mvkOSVersionIsAtLeast(MVKOSVersion minVer) { return true; }
+ 
+ /**
+  * Returns whether the operating system version is at least the appropriate min version.
+@@ -53,12 +53,13 @@ inline bool mvkOSVersionIsAtLeast(MVKOSVersion minVer) { return mvkOSVersion() >
+  * this test is not supported on that OS.
+  */
+ inline bool mvkOSVersionIsAtLeast(MVKOSVersion macOSMinVer, MVKOSVersion iOSMinVer) {
+-#if MVK_MACOS
++/*#if MVK_MACOS
+ 	return mvkOSVersionIsAtLeast(macOSMinVer);
+ #endif
+ #if MVK_IOS_OR_TVOS
+ 	return mvkOSVersionIsAtLeast(iOSMinVer);
+-#endif
++#endif*/
++    return true;
+ }
+ 
+ /**
+diff --git a/MoltenVK/MoltenVK.xcodeproj/project.pbxproj b/MoltenVK/MoltenVK.xcodeproj/project.pbxproj
+index ff2a8fde..25bb7c60 100644
+--- a/MoltenVK/MoltenVK.xcodeproj/project.pbxproj
++++ b/MoltenVK/MoltenVK.xcodeproj/project.pbxproj
+@@ -1640,7 +1640,7 @@
+ 					"\"$(SRCROOT)/../External/cereal/include\"",
+ 					"\"${BUILT_PRODUCTS_DIR}\"",
+ 				);
+-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				MACH_O_TYPE = staticlib;
+ 				MACOSX_DEPLOYMENT_TARGET = 10.13;
+ 				MTL_ENABLE_DEBUG_INFO = YES;
+@@ -1711,7 +1711,7 @@
+ 					"\"$(SRCROOT)/../External/cereal/include\"",
+ 					"\"${BUILT_PRODUCTS_DIR}\"",
+ 				);
+-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				MACH_O_TYPE = staticlib;
+ 				MACOSX_DEPLOYMENT_TARGET = 10.13;
+ 				MTL_ENABLE_DEBUG_INFO = NO;
+diff --git a/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h b/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h
+index 5186fe4a..172a2b6d 100644
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h
+@@ -349,7 +349,7 @@ public:
+ 	id<MTLDevice> getMTLDevice() { return _mtlDevice; }
+ 
+ 	/** Returns whether the MSL version is supported on this device. */
+-	bool mslVersionIsAtLeast(MTLLanguageVersion minVer) { return _metalFeatures.mslVersionEnum >= minVer; }
++	bool mslVersionIsAtLeast(MTLLanguageVersion minVer) { return true; }
+ 
+ 	/** Returns whether this physical device supports Metal argument buffers. */
+ 	bool supportsMetalArgumentBuffers() const  {
+diff --git a/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm b/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm
+index 3723a8f1..d05910e7 100644
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm
+@@ -55,10 +55,10 @@ using namespace std;
+ #if MVK_MACCAT
+ #define supportsMTLFeatureSet(MFS)	[_mtlDevice supportsFamily: MTLFeatureSet_ ##MFS]
+ #else
+-#define supportsMTLFeatureSet(MFS)	[_mtlDevice supportsFeatureSet: MTLFeatureSet_ ##MFS]
++#define supportsMTLFeatureSet(MFS)	(true)
+ #endif
+ 
+-#define supportsMTLGPUFamily(GPUF)	([_mtlDevice respondsToSelector: @selector(supportsFamily:)] && [_mtlDevice supportsFamily: MTLGPUFamily ##GPUF])
++#define supportsMTLGPUFamily(GPUF)	(true)
+ 
+ // Suppress unused variable warnings to allow us to define these all in one place,
+ // but use them in platform-conditional code blocks.
+@@ -1983,6 +1983,8 @@ void MVKPhysicalDevice::initMetalFeatures() {
+ 	}
+ #endif
+ 
++    _metalFeatures.mslVersionEnum = MTLLanguageVersion3_0;
++
+ 	// This is an Apple GPU--treat it accordingly.
+ 	if (supportsMTLGPUFamily(Apple1)) {
+ 		_metalFeatures.mtlCopyBufferAlignment = 1;
+@@ -2099,6 +2101,7 @@ void MVKPhysicalDevice::initMetalFeatures() {
+ 	switch (_metalFeatures.mslVersionEnum) {
+ #if MVK_XCODE_14
+ 		case MTLLanguageVersion3_0:
++        case MTLLanguageVersion3_1:
+ 			setMSLVersion(3, 0);
+ 			break;
+ #endif
+diff --git a/MoltenVKShaderConverter/MoltenVKShaderConverter.xcodeproj/project.pbxproj b/MoltenVKShaderConverter/MoltenVKShaderConverter.xcodeproj/project.pbxproj
+index 56957d74..d7f3a311 100644
+--- a/MoltenVKShaderConverter/MoltenVKShaderConverter.xcodeproj/project.pbxproj
++++ b/MoltenVKShaderConverter/MoltenVKShaderConverter.xcodeproj/project.pbxproj
+@@ -3,7 +3,7 @@
+ 	archiveVersion = 1;
+ 	classes = {
+ 	};
+-	objectVersion = 52;
++	objectVersion = 54;
+ 	objects = {
+ 
+ /* Begin PBXBuildFile section */
+@@ -636,7 +636,7 @@
+ 					"\"$(SRCROOT)/glslang\"",
+ 					"\"$(SRCROOT)/glslang/External/spirv-tools/include\"",
+ 				);
+-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+ 				MACH_O_TYPE = staticlib;
+ 				MACOSX_DEPLOYMENT_TARGET = 10.13;
+ 				PRODUCT_NAME = MoltenVKShaderConverter;
+@@ -696,7 +696,7 @@
+ 					"\"$(SRCROOT)/glslang\"",
+ 					"\"$(SRCROOT)/glslang/External/spirv-tools/include\"",
+ 				);
+-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+ 				MACH_O_TYPE = staticlib;
+ 				MACOSX_DEPLOYMENT_TARGET = 10.13;
+ 				PRODUCT_NAME = MoltenVKShaderConverter;

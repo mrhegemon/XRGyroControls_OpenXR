@@ -46,10 +46,14 @@ extern "C" int openxr_init()
     return EXIT_FAILURE;
   }
 
+  printf("XRHax: createDevice!\n");
+
   if (!context->createDevice())
   {
     return EXIT_FAILURE;
   }
+
+  printf("XRHax: create Headset!\n");
 
   headset = new Headset(context);
   if (!headset || !headset->isValid())
@@ -57,18 +61,23 @@ extern "C" int openxr_init()
     return EXIT_FAILURE;
   }
 
+  printf("XRHax: create Renderer!\n");
+
   renderer = new Renderer(context, headset);
   if (!renderer || !renderer->isValid())
   {
+    printf("XRHax: create Renderer failed!\n");
     return EXIT_FAILURE;
   }
+
+  printf("XRHax: OpenXR init success!\n");
 
   return EXIT_SUCCESS;
 }
 
 extern "C" int openxr_loop()
 {
-  printf("XRHax: OpenXR loop start");
+  //printf("XRHax: OpenXR loop start\n");
   if (!context || !context->isValid()) {
     if(openxr_init() != EXIT_SUCCESS) {
       openxr_is_done = 1;
@@ -99,7 +108,7 @@ extern "C" int openxr_loop()
   {
     headset->endFrame();
   }
-  printf("XRHax: OpenXR loop start\n");
+  //printf("XRHax: OpenXR loop done\n");
 
   //context.sync(); // Sync before destroying so that resources are free
   return 0;

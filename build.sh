@@ -1,12 +1,17 @@
 
 #!/bin/zsh
+PWD=$(pwd)
 cmake -B build -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S .
 ninja -C build
-
 retVal=$?
 if [ $retVal -ne 0 ]; then
     exit $retVal
 fi
+
+mkdir -p shaders && cp openxr_src/shaders/* shaders/ && cd $PWD && \
+glslc --target-env=vulkan1.2 $PWD/shaders/Basic.vert -std=450core -O -o $PWD/shaders/Basic.vert.spv && \
+glslc --target-env=vulkan1.2 $PWD/shaders/Cube.frag -std=450core -O -o $PWD/shaders/Cube.frag.spv && \
+glslc --target-env=vulkan1.2 $PWD/shaders/Grid.frag -std=450core -O -o $PWD/shaders/Grid.frag.spv
 
 cp build/libXRGyroControls.dylib libXRGyroControls.dylib
 
@@ -66,7 +71,8 @@ fixup_dependency libopenxr_monado.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMol
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/cjson/lib/libcjson.1.dylib
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.8.dylib
 
-#cp $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib libvulkan.1.dylib
+cp libMoltenVK_iossim.dylib libMoltenVK.dylib
+fixup_dependency libMoltenVK.dylib libMoltenVK.dylib
 #vtool_src=libvulkan.1.dylib
 #vtool_dst=libvulkan.1.dylib
 #vtool -remove-build-version macos -output $vtool_dst $vtool_src

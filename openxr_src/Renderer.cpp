@@ -66,6 +66,8 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
 
+  printf("XRHax: asdf1\n");
+
   // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -76,6 +78,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf2\n");
 
   // Create a descriptor pool
   VkDescriptorPoolSize descriptorPoolSize;
@@ -92,6 +95,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf3\n");
 
   // Create a descriptor set layout
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
@@ -110,6 +114,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf4\n");
 
   // Create a pipeline layout
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -121,6 +126,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf\n");
 
   // Create a render process for each frame in flight
   renderProcesses.resize(numFramesInFlight);
@@ -133,6 +139,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
       return;
     }
   }
+  printf("XRHax: asdf5\n");
 
   // Create the grid pipeline
   VkVertexInputBindingDescription vertexInputBindingDescription;
@@ -151,6 +158,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   vertexInputAttributeDescriptionColor.location = 1u;
   vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
   vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
+  printf("XRHax: asdf6\n");
 
   gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
                               "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Grid.frag.spv", { vertexInputBindingDescription },
@@ -160,6 +168,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf7\n");
 
   // Create the cube pipeline
   cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
@@ -170,8 +179,9 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
+  printf("XRHax: asdf8\n");
 
-  for (int i = 0; i < 64; i++) {
+  /*for (int i = 0; i < 64; i++) {
     char tmp[256];
     snprintf(tmp, 256, "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Pt%u.vert.spv", i);
     // Create the cube pipeline
@@ -183,7 +193,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
       valid = false;
       return;
     }
-  }
+  }*/
 
   // Create a vertex buffer
   {
@@ -218,6 +228,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     // Clean up the staging buffer
     delete stagingBuffer;
   }
+  printf("XRHax: asdf9\n");
 
   // Create an index buffer
   {
@@ -252,6 +263,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     // Clean up the staging buffer
     delete stagingBuffer;
   }
+  printf("XRHax: asdf 10\n");
 }
 
 Renderer::~Renderer()
@@ -307,7 +319,7 @@ void Renderer::render(size_t swapchainImageIndex)
   glm::vec3 handScale2 = glm::vec3(handScaleAll2 * (1.0 / 2.0), handScaleAll2 * (1.0 / 2.0), handScaleAll2 * (1.0 / 2.0));
 
 
-  for (int i = 0; i < 64; i++)
+  /*for (int i = 0; i < 64; i++)
   {
     glm::mat4 trans1 = glm::translate(glm::mat4(1.0f), { 0.0f, -1.4f/2.0, 2.0f });
     glm::mat4 scale1 = glm::scale(glm::mat4(1.0f), i < 2 ? handScale1 : handScale2);
@@ -317,7 +329,7 @@ void Renderer::render(size_t swapchainImageIndex)
     glm::mat4 realMat_l = trans2_l * rot_l * scale1 * trans1;
 
     renderProcess->uniformBufferData.tracked_points[i] = realMat_l;
-  }
+  }*/
 
   renderProcess->uniformBufferData.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
   for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
@@ -381,10 +393,10 @@ void Renderer::render(size_t swapchainImageIndex)
   vkCmdDrawIndexed(commandBuffer, 36u, 1u, 6u, 0u, 0u);
 
   // Draw the lhand cube
-  for (int i = 0; i < 64; i++) {
+  /*for (int i = 0; i < 64; i++) {
     trackedPipeline[i]->bind(commandBuffer);
     vkCmdDrawIndexed(commandBuffer, 36u, 1u, 6u, 0u, 0u);
-  }
+  }*/
 
   vkCmdEndRenderPass(commandBuffer);
 }

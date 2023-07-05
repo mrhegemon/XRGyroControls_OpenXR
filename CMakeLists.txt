@@ -42,6 +42,11 @@ add_library(OpenXRCpp STATIC
 )
 
 # Main library
+add_library(Dummy 
+  dummy.m
+)
+
+# Main library
 add_library(XRGyroControls 
   visionos_stereo_screenshots.m
 )
