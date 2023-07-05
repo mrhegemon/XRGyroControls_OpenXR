@@ -8,6 +8,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows OR CMAKE_SYSTEM_NAME STREQUAL Darwin)
   option(BUILD_SHARED_LIBS "Build shared libraries by default" YES)
 endif()
 
+#set(CMAKE_OSX_SYSROOT "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk")
 #set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${PROJECT_SOURCE_DIR}/openxr-Bridging-Header.h")  
 
 find_package(OpenGL REQUIRED)
@@ -15,14 +16,9 @@ find_package(GLEW 2.0 REQUIRED)
 find_package(VULKAN REQUIRED Vulkan::Vulkan)
 
 add_subdirectory(external/glm)
-add_subdirectory(external/glfw)
 INCLUDE(FindPkgConfig)
-PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
-PKG_SEARCH_MODULE(GLFW REQUIRED glfw3)
+#PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 
-# SimulatorKit framework
-add_library(SimulatorKit SimulatorKit/SimulatorKit.swift)
-target_compile_options(SimulatorKit PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator)
 
 add_library(OpenXRCpp STATIC
   openxr_src/Buffer.cpp
@@ -33,8 +29,6 @@ add_library(OpenXRCpp STATIC
   openxr_src/Headset.h
   openxr_src/Main.cpp
   openxr_src/Main.h
-  openxr_src/MirrorView.cpp
-  openxr_src/MirrorView.h
   openxr_src/Pipeline.cpp
   openxr_src/Pipeline.h
   openxr_src/Renderer.cpp
@@ -49,12 +43,14 @@ add_library(OpenXRCpp STATIC
 
 # Main library
 add_library(XRGyroControls 
-  IndigoHID.swift SimulatorSupport.swift OpenXRWrapper.swift
+  visionos_stereo_screenshots.m
 )
-target_compile_options(XRGyroControls PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator -import-objc-header ${CMAKE_SOURCE_DIR}/openxr-Bridging-Header.h)
-target_link_libraries(XRGyroControls PRIVATE SimulatorKit /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator)
-set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
+#target_link_libraries(OpenXRCpp PRIVATE -framework Metal -framework CompositorServices)
+target_link_options(XRGyroControls PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk")
 
+set_source_files_properties(visionos_stereo_screenshots.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc -isysroot \"/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk\"")
+
+set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
 # First try openxr.pc from OpenXR SDK
 include(FindPkgConfig)
@@ -82,11 +78,11 @@ else()
   target_link_libraries(XRGyroControls PRIVATE OpenXR::openxr_loader)
 endif()
 
-target_link_libraries(OpenXRCpp PRIVATE ${OPENGL_LIBRARIES} ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
-target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${OPENGL_LIBRARIES} ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
+target_link_libraries(OpenXRCpp PRIVATE m glm)
+target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} m glm)
 
 # TODO handle this better?
 target_link_libraries(XRGyroControls PRIVATE /Users/maxamillion/workspace/monado/build/src/xrt/targets/openxr/libopenxr_monado.dylib)
-target_link_libraries(XRGyroControls PRIVATE /opt/homebrew/Caskroom/vulkan-sdk/1.2.162.1/macOS/lib/libvulkan.1.dylib)
+target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib)
 
-target_include_directories(OpenXRCpp PRIVATE ${SDL2_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS})
+target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS})

@@ -2,8 +2,6 @@
 
 #include "Util.h"
 
-#include <glfw/glfw3.h>
-
 #include <sstream>
 
 #ifdef DEBUG
@@ -27,24 +25,6 @@ extern "C" void GLFW_error(int error, const char* description)
 
 Context::Context()
 {
-  // Initialize GLFW
-  if (!glfwInit())
-  {
-    printf("Fail glfwInit\n");
-    util::error(Error::GenericGLFW);
-    valid = false;
-    return;
-  }
-
-  glfwSetErrorCallback(GLFW_error);
-
-  if (!glfwVulkanSupported())
-  {
-    util::error(Error::VulkanNotSupported);
-    valid = false;
-    return;
-  }
-
   // Get all supported OpenXR instance extensions
   std::vector<XrExtensionProperties> supportedOpenXRInstanceExtensions;
   {
@@ -324,7 +304,7 @@ Context::Context()
   // Get the required Vulkan instance extensions from GLFW
   std::vector<const char*> vulkanInstanceExtensions;
   {
-    uint32_t requiredExtensionCount;
+    /*uint32_t requiredExtensionCount;
     const char** buffer = glfwGetRequiredInstanceExtensions(&requiredExtensionCount);
     if (!buffer)
     {
@@ -337,7 +317,7 @@ Context::Context()
     for (uint32_t i = 0u; i < requiredExtensionCount; ++i)
     {
       vulkanInstanceExtensions.push_back(buffer[i]);
-    }
+    }*/
     vulkanInstanceExtensions.push_back("VK_MVK_macos_surface");
     vulkanInstanceExtensions.push_back("VK_EXT_metal_surface");
   }
@@ -549,7 +529,7 @@ Context::~Context()
   vkDestroyInstance(vkInstance, nullptr);
 }
 
-bool Context::createDevice(VkSurfaceKHR mirrorSurface)
+bool Context::createDevice()
 {
   // Retrieve the physical device from OpenXR
   XrResult result = xrGetVulkanGraphicsDeviceKHR(xrInstance, systemId, vkInstance, &physicalDevice);
@@ -620,12 +600,12 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
       }
 
       // Check the queue family for presenting support
-      VkBool32 presentSupport = false;
-      if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
+      VkBool32 presentSupport = true;
+      /*if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
                                                mirrorSurface, &presentSupport) != VK_SUCCESS)
       {
         continue;
-      }
+      }*/
 
       if (!presentQueueFamilyIndexFound && presentSupport)
       {

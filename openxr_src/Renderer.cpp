@@ -80,10 +80,10 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   // Create a descriptor pool
   VkDescriptorPoolSize descriptorPoolSize;
   descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorPoolSize.descriptorCount = 1u;
+  descriptorPoolSize.descriptorCount = 16u;
 
   VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-  descriptorPoolCreateInfo.poolSizeCount = 1u;
+  descriptorPoolCreateInfo.poolSizeCount = 16u;
   descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
   descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(numFramesInFlight);
   if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)

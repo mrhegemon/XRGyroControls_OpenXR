@@ -12,7 +12,7 @@ public:
   Context();
   ~Context();
 
-  bool createDevice(VkSurfaceKHR mirrorSurface);
+  bool createDevice();
   void sync() const;
 
   bool isValid() const;

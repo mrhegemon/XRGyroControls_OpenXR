@@ -1,11 +1,18 @@
 #include "../openxr-Bridging-Header.h"
 #include "Context.h"
 #include "Headset.h"
-#include "MirrorView.h"
 #include "Renderer.h"
+#include <unistd.h>
+#include <stdlib.h>
+
+extern "C"
+{
+  int redirect_nslog(const char *prefix, const char *buffer, int size);
+  int stderr_redirect_nslog(void *inFD, const char *buffer, int size);
+  int stdout_redirect_nslog(void *inFD, const char *buffer, int size);
+}
 
 Context* context = nullptr;
-MirrorView* mirrorView = nullptr;
 Headset* headset = nullptr;
 Renderer* renderer = nullptr;
 int openxr_is_done = 0;
@@ -16,44 +23,33 @@ extern "C" int openxr_init();
 
 extern "C" int openxr_main()
 {
-  printf("OpenXR main!\n");
+  printf("XRHax: OpenXR main!\n");
   //openxr_init();
   //while (!openxr_loop()) {}
-  printf("OpenXR main done!\n");
+  printf("XRHax: OpenXR main done!\n");
   return 0;
 }
 
 
 extern "C" int openxr_init()
 {
-  printf("OpenXR init!\n");
+  setlinebuf(stdout);
+  setlinebuf(stderr);
+  stdout->_write = stdout_redirect_nslog;
+  stderr->_write = stderr_redirect_nslog;
+  //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
+
+  printf("XRHax: OpenXR init!\n");
   context = new Context();
   if (!context || !context->isValid())
   {
     return EXIT_FAILURE;
   }
 
-#ifdef DO_MIRROR
-  mirrorView = new MirrorView(context);
-  if (!mirrorView || !mirrorView->isValid())
+  if (!context->createDevice())
   {
     return EXIT_FAILURE;
   }
-
-  if (!context->createDevice(mirrorView->getSurface()))
-  {
-    return EXIT_FAILURE;
-  }
-#endif
-
-#ifndef DO_MIRROR
-  VkSurfaceKHR surface = 0;
-  if (!context->createDevice(surface))
-  {
-    return EXIT_FAILURE;
-  }
-  delete mirrorView;
-#endif
 
   headset = new Headset(context);
   if (!headset || !headset->isValid())
@@ -67,18 +63,12 @@ extern "C" int openxr_init()
     return EXIT_FAILURE;
   }
 
-#ifdef DO_MIRROR
-  if (!mirrorView->connect(headset, renderer))
-  {
-    return EXIT_FAILURE;
-  }
-#endif
-
   return EXIT_SUCCESS;
 }
 
 extern "C" int openxr_loop()
 {
+  printf("XRHax: OpenXR loop start");
   if (!context || !context->isValid()) {
     if(openxr_init() != EXIT_SUCCESS) {
       openxr_is_done = 1;
@@ -92,15 +82,6 @@ extern "C" int openxr_loop()
     return 1;
   }
 
-#ifdef DO_MIRROR
-  if (mirrorView->isExitRequested()) {
-    openxr_is_done = 1;
-    return 1;
-  }
-
-  //mirrorView->processWindowEvents();
-#endif
-
   uint32_t swapchainImageIndex;
   const Headset::BeginFrameResult frameResult = headset->beginFrame(swapchainImageIndex);
   if (frameResult == Headset::BeginFrameResult::Error)
@@ -111,29 +92,14 @@ extern "C" int openxr_loop()
   else if (frameResult == Headset::BeginFrameResult::RenderFully)
   {
     renderer->render(swapchainImageIndex);
-
-#ifdef DO_MIRROR
-    const MirrorView::RenderResult mirrorResult = mirrorView->render(swapchainImageIndex);
-    if (mirrorResult == MirrorView::RenderResult::Error)
-    {
-      openxr_is_done = 1;
-      return 1;
-    }
-
-    const bool mirrorViewVisible = (mirrorResult == MirrorView::RenderResult::Visible);
-    renderer->submit(mirrorViewVisible);
-
-    if (mirrorViewVisible)
-    {
-      mirrorView->present();
-    }
-#endif
+    renderer->submit(false);
   }
 
   if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
   {
     headset->endFrame();
   }
+  printf("XRHax: OpenXR loop start\n");
 
   //context.sync(); // Sync before destroying so that resources are free
   return 0;
@@ -151,11 +117,9 @@ extern "C" int openxr_cleanup()
 
   delete renderer;
   delete headset;
-  delete mirrorView;
   delete context;
 
   context = nullptr;
-  mirrorView = nullptr;
   headset = nullptr;
   renderer = nullptr;
   return 0;
