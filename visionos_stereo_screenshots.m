@@ -166,7 +166,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
     }];
   }
 
-  NSLog(@"visionos_stereo_screenshot: present");
+  //NSLog(@"visionos_stereo_screenshot: present");
   openxr_loop();
 
   return cp_drawable_encode_present(drawable, command_buffer);
@@ -311,6 +311,41 @@ __attribute__((constructor)) static void SetupSignalHandler() {
 
   //openxr_main();
 }
+
+void __attribute__ ((constructor)) premain(void) {
+#ifdef __x86_64__
+    register void* r15 asm("r15");  //dyld4::gDyld
+    register void* (*typed_dlopen)( void*, char const*, int) asm("rax");
+    register void* (*typed_dlsym)(void*, char const*, void*) asm("rcx");
+    __asm volatile(".intel_syntax noprefix;"
+                   "mov rax,[r15];"
+                   "mov rcx,[rax + 0x88];"
+                   "mov rax,[rax + 0x70];"
+                   : "=r"(typed_dlopen), "=r"(r15), "=r"(typed_dlsym)); //dyld4::gDyld
+    void* handle = typed_dlopen(r15, "libc.dylib", RTLD_NOW);
+    int (*myPrintf)(const char * __restrict, ...) = typed_dlsym(r15, handle, "printf");
+
+    myPrintf("Hello world");
+#endif
+#if TARGET_CPU_ARM64
+    register void* x8 asm("x8");  //dyld4::gDyld
+    register void* (*typed_dlopen)( void*, char const*, int) asm("x0");
+    register void* (*typed_dlsym)(void*, char const*, void*) asm("x1");
+
+    __asm volatile("ldr x0,[x8] \t\n"
+                   "ldr x1,[x0, 0x88]\t\n"
+                   "ldr x0,[x0, 0x70]\t\n"
+                   : "=r"(typed_dlopen), "=r"(x8), "=r"(typed_dlsym)); //dyld4::gDyld
+
+    void* handle = typed_dlopen(x8, "libc.dylib", RTLD_NOW);
+    int (*myPrintf)(const char * __restrict, ...) = typed_dlsym(x8, handle, "printf");
+    void* searched_dlopen = typed_dlsym(x8, handle, "dlopen");
+
+    myPrintf("Hello world");
+
+    NSLog(@"stdout typed_dlopen %p dlopen %p searched_dlopen %p handle %p", typed_dlopen, dlopen, searched_dlopen, handle);
+#endif
+} 
 
 int redirect_nslog(const char *prefix, const char *buffer, int size)
 {

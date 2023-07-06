@@ -17,6 +17,7 @@ find_package(VULKAN REQUIRED Vulkan::Vulkan)
 
 add_subdirectory(external/glm)
 INCLUDE(FindPkgConfig)
+pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
 #PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 
 
@@ -41,7 +42,7 @@ add_library(OpenXRCpp STATIC
   openxr_src/Util.h
 )
 
-# Main library
+# dummy library
 add_library(Dummy 
   dummy.m
 )
@@ -88,6 +89,6 @@ target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} 
 
 # TODO handle this better?
 target_link_libraries(XRGyroControls PRIVATE /Users/maxamillion/workspace/monado/build/src/xrt/targets/openxr/libopenxr_monado.dylib)
-target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib)
+target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib)
 
-target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS})
+target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS})

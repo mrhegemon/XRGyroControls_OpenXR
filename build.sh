@@ -1,6 +1,18 @@
 
 #!/bin/zsh
 PWD=$(pwd)
+
+#xcrun mig \
+#    -arch arm64 \
+#    -DIOKIT \
+#    -I./include \
+#    ../xnu/osfmk/device/device.defs
+
+cd libusb
+#./bootstrap.sh
+make
+cd ..
+
 cmake -B build -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S .
 ninja -C build
 retVal=$?
@@ -45,6 +57,7 @@ function fixup_dependency ()
     install_name_tool -change /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation $vtool_dst
     install_name_tool -change /System/Library/Frameworks/Security.framework/Versions/A/Security /System/Library/Frameworks/Security.framework/Security $vtool_dst
     install_name_tool -change /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit /System/Library/Frameworks/IOKit.framework/IOKit $vtool_dst
+    #install_name_tool -change /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit $(pwd)/IOKit_arm64.dylib $vtool_dst
 
     install_name_tool -change /System/Library/Frameworks/Metal.framework/Versions/A/Metal /System/Library/Frameworks/Metal.framework/Metal $vtool_dst
     install_name_tool -change /System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface /System/Library/Frameworks/IOSurface.framework/IOSurface $vtool_dst
@@ -52,6 +65,7 @@ function fixup_dependency ()
     install_name_tool -change /System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore /System/Library/Frameworks/QuartzCore.framework/QuartzCore $vtool_dst
     install_name_tool -change /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics /System/Library/Frameworks/CoreGraphics.framework/CoreGraphics $vtool_dst
     install_name_tool -change /System/Library/Frameworks/Foundation.framework/Versions/C/Foundation /System/Library/Frameworks/Foundation.framework/Foundation $vtool_dst
+    install_name_tool -change /System/Library/PrivateFrameworks/SoftLinking.framework/Versions/A/SoftLinking /System/Library/PrivateFrameworks/SoftLinking.framework/SoftLinking $vtool_dst
 
     codesign -s - $vtool_dst --force --deep --verbose
 }
@@ -61,15 +75,32 @@ fixup_dependency libXRGyroControls.dylib /Users/maxamillion/workspace/monado/bui
 fixup_dependency libXRGyroControls.dylib $VULKAN_SDK/lib/libvulkan.1.dylib
 fixup_dependency libXRGyroControls.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
 fixup_dependency libXRGyroControls.dylib /opt/homebrew/opt/glfw/lib/libglfw.3.dylib
+fixup_dependency libXRGyroControls.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
 
 #fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/hidapi/lib/libhidapi.0.dylib
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
+
+#cp libusb/libusb/.libs/libusb-1.0.0.dylib libusb-1.0.0.dylib
+fixup_dependency libopenxr_monado.dylib libusb/libusb/.libs/libusb-1.0.0.dylib
 
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/x264/lib/libx264.164.dylib
 fixup_dependency libopenxr_monado.dylib $VULKAN_SDK/lib/libvulkan.1.dylib
 fixup_dependency libopenxr_monado.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/cjson/lib/libcjson.1.dylib
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.8.dylib
+
+vtool -remove-build-version macos -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
+vtool -remove-build-version ios -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
+vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
+
+vtool -remove-build-version macos -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
+vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
+
+#vtool -remove-build-version ios -output  IOUSBLib_ios_macos.dylib IOUSBLib_ios_macos.dylib
+#vtool -set-build-version macos 14.0 14.0 -tool ld 902.8 -output IOUSBLib_ios_macos.dylib IOUSBLib_ios_macos.dylib
+#codesign -s - IOUSBLib_ios_macos.dylib --force --deep --verbose
+
+codesign -s - IOUSBLib_ios_hax.dylib --force --deep --verbose
 
 cp libMoltenVK_iossim.dylib libMoltenVK.dylib
 fixup_dependency libMoltenVK.dylib libMoltenVK.dylib

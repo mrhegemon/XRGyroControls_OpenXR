@@ -66,8 +66,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
 
-  printf("XRHax: asdf1\n");
-
   // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -78,7 +76,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf2\n");
 
   // Create a descriptor pool
   VkDescriptorPoolSize descriptorPoolSize;
@@ -95,7 +92,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf3\n");
 
   // Create a descriptor set layout
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
@@ -114,7 +110,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf4\n");
 
   // Create a pipeline layout
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -126,7 +121,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf\n");
 
   // Create a render process for each frame in flight
   renderProcesses.resize(numFramesInFlight);
@@ -139,7 +133,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
       return;
     }
   }
-  printf("XRHax: asdf5\n");
 
   // Create the grid pipeline
   VkVertexInputBindingDescription vertexInputBindingDescription;
@@ -158,7 +151,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   vertexInputAttributeDescriptionColor.location = 1u;
   vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
   vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
-  printf("XRHax: asdf6\n");
 
   gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
                               "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Grid.frag.spv", { vertexInputBindingDescription },
@@ -168,7 +160,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf7\n");
 
   // Create the cube pipeline
   cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
@@ -179,7 +170,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     valid = false;
     return;
   }
-  printf("XRHax: asdf8\n");
 
   /*for (int i = 0; i < 64; i++) {
     char tmp[256];
@@ -228,7 +218,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     // Clean up the staging buffer
     delete stagingBuffer;
   }
-  printf("XRHax: asdf9\n");
 
   // Create an index buffer
   {
@@ -263,7 +252,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     // Clean up the staging buffer
     delete stagingBuffer;
   }
-  printf("XRHax: asdf 10\n");
 }
 
 Renderer::~Renderer()
@@ -343,7 +331,7 @@ void Renderer::render(size_t swapchainImageIndex)
     return;
   }
 
-  const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
+  const std::array clearValues = { VkClearValue({ 1.00f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
   VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
   renderPassBeginInfo.renderPass = headset->getRenderPass();
