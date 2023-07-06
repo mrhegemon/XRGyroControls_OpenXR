@@ -152,8 +152,8 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
   vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
 
-  gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
-                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Grid.frag.spv", { vertexInputBindingDescription },
+  gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Basic.vert.spv",
+                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Grid.frag.spv", { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
   if (!gridPipeline->isValid())
   {
@@ -162,8 +162,8 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   }
 
   // Create the cube pipeline
-  cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Basic.vert.spv",
-                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Cube.frag.spv", { vertexInputBindingDescription },
+  cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Basic.vert.spv",
+                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Cube.frag.spv", { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
   if (!cubePipeline->isValid())
   {
@@ -331,7 +331,7 @@ void Renderer::render(size_t swapchainImageIndex)
     return;
   }
 
-  const std::array clearValues = { VkClearValue({ 1.00f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
+  const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
   VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
   renderPassBeginInfo.renderPass = headset->getRenderPass();

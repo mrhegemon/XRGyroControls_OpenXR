@@ -3,7 +3,7 @@
 layout(binding = 0) uniform UniformBufferObject
 {
     mat4 world;
-    mat4 tracked_points[64];
+    //mat4 tracked_points[64];
     mat4 viewProjection[2];
 } ubo;
 

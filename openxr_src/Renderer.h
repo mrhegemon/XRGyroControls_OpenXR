@@ -37,7 +37,7 @@ private:
   std::vector<RenderProcess*> renderProcesses;
   VkPipelineLayout pipelineLayout = nullptr;
   Pipeline *gridPipeline = nullptr, *cubePipeline = nullptr;
-  Pipeline *trackedPipeline[64];
+  //Pipeline *trackedPipeline[64];
   Buffer *vertexBuffer = nullptr, *indexBuffer = nullptr;
   size_t currentRenderProcessIndex = 0u;
 };
