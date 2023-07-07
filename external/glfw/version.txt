@@ -1,3 +1,0 @@
-src = https://github.com/glfw/glfw
-
-win = 3.3-stable
