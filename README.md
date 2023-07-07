@@ -9,6 +9,6 @@ Before building, do the following:
 
 Run `build_run.sh` to reset and then inject into the visionOS simulator. Run `build_inject.sh` to just inject into an existing instance.
 
-Running list of brew dependencies I remember: `brew install gsed`
+Running list of brew dependencies I remember: `brew install autoconf automake libtool gsed`
 
 See `build.sh` for a list of my sins.
