@@ -85,7 +85,7 @@ target_link_libraries(OpenXRCpp PRIVATE m glm)
 target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} m glm)
 
 # TODO handle this better?
-target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib)
+target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/openxr/libopenxr_monado.dylib)
 target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib)
 
 target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS}  $ENV{VULKAN_SDK}/include)
