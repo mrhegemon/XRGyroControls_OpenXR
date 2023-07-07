@@ -69,6 +69,10 @@ public:
   XrHandJointLocationsEXT rightLocations;
 
   std::vector<XrView> eyePoses;
+  std::vector<glm::mat4> eyeViewMatrices;
+  std::vector<glm::mat4> eyeProjectionMatrices;
+  float eyeTangents_l[4];
+  float eyeTangents_r[4];
 
 private:
   bool valid = true;
@@ -79,8 +83,6 @@ private:
   const Context* context = nullptr;
 
   size_t eyeCount = 0u;
-  std::vector<glm::mat4> eyeViewMatrices;
-  std::vector<glm::mat4> eyeProjectionMatrices;
 
   XrSession session = nullptr;
   XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;

@@ -7,7 +7,11 @@ RenderProcess::RenderProcess(VkDevice device,
                              VkPhysicalDevice physicalDevice,
                              VkCommandPool commandPool,
                              VkDescriptorPool descriptorPool,
-                             VkDescriptorSetLayout descriptorSetLayout)
+                             VkDescriptorSetLayout descriptorSetLayout,
+                             VkImageView textureImageView,
+                             VkSampler textureSampler,
+                             VkImageView textureImageView2,
+                             VkSampler textureSampler2)
 : device(device)
 {
   // Initialize the uniform buffer data
@@ -87,18 +91,51 @@ RenderProcess::RenderProcess(VkDevice device,
   descriptorBufferInfo.offset = 0u;
   descriptorBufferInfo.range = VK_WHOLE_SIZE;
 
-  VkWriteDescriptorSet writeDescriptorSet;
-  writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  writeDescriptorSet.pNext = nullptr;
-  writeDescriptorSet.dstSet = descriptorSet;
-  writeDescriptorSet.dstBinding = 0u;
-  writeDescriptorSet.dstArrayElement = 0u;
-  writeDescriptorSet.descriptorCount = 1u;
-  writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-  writeDescriptorSet.pImageInfo = nullptr;
-  writeDescriptorSet.pTexelBufferView = nullptr;
-  vkUpdateDescriptorSets(device, 1u, &writeDescriptorSet, 0u, nullptr);
+  VkDescriptorImageInfo imageInfo{};
+  imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  imageInfo.imageView = textureImageView;
+  imageInfo.sampler = textureSampler;
+
+  VkDescriptorImageInfo imageInfo2{};
+  imageInfo2.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  imageInfo2.imageView = textureImageView2;
+  imageInfo2.sampler = textureSampler2;
+
+  VkWriteDescriptorSet writeDescriptorSet[3];
+  writeDescriptorSet[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[0].pNext = nullptr;
+  writeDescriptorSet[0].dstSet = descriptorSet;
+  writeDescriptorSet[0].dstBinding = 0u;
+  writeDescriptorSet[0].dstArrayElement = 0u;
+  writeDescriptorSet[0].descriptorCount = 1u;
+  writeDescriptorSet[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writeDescriptorSet[0].pBufferInfo = &descriptorBufferInfo;
+  writeDescriptorSet[0].pImageInfo = nullptr;
+  writeDescriptorSet[0].pTexelBufferView = nullptr;
+
+  writeDescriptorSet[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[1].pNext = nullptr;
+  writeDescriptorSet[1].dstSet = descriptorSet;
+  writeDescriptorSet[1].dstBinding = 1;
+  writeDescriptorSet[1].dstArrayElement = 0;
+  writeDescriptorSet[1].descriptorCount = 1u;
+  writeDescriptorSet[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[1].pBufferInfo = nullptr;
+  writeDescriptorSet[1].pImageInfo = &imageInfo;
+  writeDescriptorSet[1].pTexelBufferView = nullptr;
+
+  writeDescriptorSet[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[2].pNext = nullptr;
+  writeDescriptorSet[2].dstSet = descriptorSet;
+  writeDescriptorSet[2].dstBinding = 2;
+  writeDescriptorSet[2].dstArrayElement = 0;
+  writeDescriptorSet[2].descriptorCount = 1u;
+  writeDescriptorSet[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[2].pBufferInfo = nullptr;
+  writeDescriptorSet[2].pImageInfo = &imageInfo2;
+  writeDescriptorSet[2].pTexelBufferView = nullptr;
+
+  vkUpdateDescriptorSets(device, 3u, writeDescriptorSet, 0u, nullptr);
 }
 
 RenderProcess::~RenderProcess()

@@ -22,14 +22,39 @@ static simd_float4x4 gRightEyeMatrix = {.columns = {
                                             {0, 0, 1, 0},
                                             {0.065, 0, 0, 1},
                                         }};
+static simd_float4x4 gIdentityMat = {.columns = {
+                                            {1, 0, 0, 0},
+                                            {0, 1, 0, 0},
+                                            {0, 0, 1, 0},
+                                            {0, 0, 0, 1},
+                                        }};
+static simd_float4x4 gWorldMat = {.columns = {
+                                            {1, 0, 0, 0},
+                                            {0, 1, 0, 0},
+                                            {0, 0, 1, 0},
+                                            {0, 2.0, 0, 1},
+                                        }};
 
 // cp_drawable_get_view
 struct cp_view {
   simd_float4x4 transform;     // 0x0
   simd_float4 tangents;        // 0x40
-  char unknown[0x110 - 0x50];  // 0x50
+  uint32_t unknown_1[4];  // 0x50 (0x110 - 0x50)/4
+  uint32_t unknown_2[4];  // 0x60 (0x110 - 0x50)/4
+  float unknown_3[4];  // 0x70 (0x110 - 0x50)/4
+  float unknown_4[3];  // 0x80 (0x110 - 0x50)/4
+  float height_maybe;
+  uint32_t unknown[0x20];  // 0x90 (0x110 - 0x90)/4
 };
 static_assert(sizeof(struct cp_view) == 0x110, "cp_view size is wrong");
+
+struct ar_pose_internal {
+  uint32_t unk_0[4]; // NSObject
+  simd_float4x4 transform; // 0x10
+  simd_float4x4 transform_2; // 0x50
+};
+static_assert(sizeof(struct ar_pose_internal) == 0x90, "OS_ar_pose size is wrong");
+typedef struct ar_pose_internal* ar_pose_internal_t;
 
 // cp_view_texture_map_get_texture_index
 struct cp_view_texture_map {
@@ -48,13 +73,17 @@ static int gTakeScreenshotStatus = kTakeScreenshotStatusIdle;
 // TODO(zhuowei): multiple screenshots in flight
 static cp_drawable_t gHookedDrawable;
 
-static id<MTLTexture> gHookedExtraTexture = nil;
+id<MTLTexture> gHookedExtraTexture = nil;
 static id<MTLTexture> gHookedExtraDepthTexture = nil;
 static id<MTLTexture> gHookedExtraScrapTexture = nil;
 static id<MTLTexture> gHookedExtraScrapDepthTexture = nil;
-static id<MTLTexture> gHookedRealTexture = nil;
+
+id<MTLTexture> gHookedRealTexture = nil;
 
 static void DumpScreenshot(void);
+
+void cp_drawable_set_pose(cp_drawable_t,simd_float4x4);
+void cp_drawable_set_simd_pose(cp_drawable_t,simd_float4x4);
 
 static float CalculateFovY(float fovX, float aspect) {
   // https://cs.android.com/android/platform/superproject/+/master:external/exoplayer/tree/library/ui/src/main/java/com/google/android/exoplayer2/ui/spherical/SphericalGLSurfaceView.java;l=328;drc=2c30c028bf6b958edf635b3e4e1079e64737250a
@@ -75,6 +104,33 @@ static id<MTLTexture> MakeOurTextureBasedOnTheirTexture(id<MTLDevice> device,
   return [device newTextureWithDescriptor:descriptor];
 }
 
+#if 0
+static ar_pose_t hook_cp_drawable_get_ar_pose(cp_drawable_t drawable) {
+  ar_pose_t retval = cp_drawable_get_ar_pose(drawable);
+  printf("%p\n", retval);
+  return retval;
+}
+
+DYLD_INTERPOSE(hook_cp_drawable_get_ar_pose, cp_drawable_get_ar_pose);
+
+static void hook_cp_drawable_set_simd_pose(cp_drawable_t drawable, simd_float4x4 pose) {
+  cp_drawable_set_simd_pose(drawable, pose);
+  printf("set_simd_pose %p\n", drawable);
+}
+
+DYLD_INTERPOSE(hook_cp_drawable_set_simd_pose, cp_drawable_set_simd_pose);
+#endif
+
+void RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a);
+static void hook_RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a)
+{
+  //printf("asdf\n");
+  gWorldMat = a;
+  RETransformComponentSetWorldMatrix4x4F(a);
+}
+
+DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
+
 static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   gHookedDrawable = nil;
@@ -89,17 +145,91 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     gHookedExtraScrapDepthTexture =
         MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
   }
-  if (gTakeScreenshotStatus == kTakeScreenshotStatusScreenshotNextFrame) {
+  //if (gTakeScreenshotStatus == kTakeScreenshotStatusScreenshotNextFrame) 
+  {
     gTakeScreenshotStatus = kTakeScreenshotStatusScreenshotInProgress;
     gHookedDrawable = retval;
     gHookedRealTexture = cp_drawable_get_color_texture(retval, 0);
-    NSLog(@"visionos_stereo_screenshots starting screenshot!");
+    //NSLog(@"visionos_stereo_screenshots starting screenshot!");
   }
+  ar_pose_internal_t pose = (__bridge ar_pose_internal_t)cp_drawable_get_ar_pose(retval);
   cp_view_t leftView = cp_drawable_get_view(retval, 0);
   cp_view_t rightView = cp_drawable_get_view(retval, 1);
   memcpy(rightView, leftView, sizeof(*leftView));
-  rightView->transform = gRightEyeMatrix;
+  
   cp_view_get_view_texture_map(rightView)->texture_index = 1;
+
+  openxr_headset_data xr_data;
+  openxr_headset_get_data(&xr_data);
+
+  // Apple
+  // X is -left/+right
+  // Y is +up/-down
+  // Z is -forward/+back
+  /*leftView->transform.columns[3][0] = xr_data.l_x;
+  leftView->transform.columns[3][1] = xr_data.l_y;
+  leftView->transform.columns[3][2] = xr_data.l_z * 2.0;
+  leftView->transform.columns[3][3] = 0.0;
+
+  rightView->transform.columns[3][0] = xr_data.r_x;
+  rightView->transform.columns[3][1] = xr_data.r_y;
+  rightView->transform.columns[3][2] = xr_data.r_z * 2.0;
+  rightView->transform.columns[3][3] = 0.0;*/
+
+  simd_float4x4 view_mat_l;
+  simd_float4x4 view_mat_r;
+
+  if (xr_data.view_l)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        //printf("%u,%u: %f\n", i,j, pose->transform.columns[i][j]);
+        //pose->transform.columns[i][j] = xr_data.view_l[(i*4)+j];
+        view_mat_l.columns[i][j] = xr_data.view_l[(i*4)+j];
+        //leftView->transform.columns[i][j] = xr_data.view_l[(i*4)+j];
+        /*if (j == 2) {
+          leftView->transform.columns[i][j] *= -1.0;
+        }*/
+      }
+    }
+  }
+
+  if (xr_data.view_r)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        view_mat_r.columns[i][j] = xr_data.view_r[(i*4)+j];
+        /*if (j == 2) {
+          rightView->transform.columns[i][j] *= -1.0;
+        }*/
+      }
+    }
+  }
+
+  leftView->height_maybe = 0.0f;
+  rightView->height_maybe = 0.0f;
+
+  //gWorldMat = view_mat_l;
+  //gWorldMat.columns[3][1] += 0.0;
+  gRightEyeMatrix.columns[3][0] = view_mat_r.columns[3][0] - view_mat_l.columns[3][0];
+  //gRightEyeMatrix.columns[3][1] = view_mat_r.columns[3][1] - view_mat_l.columns[3][1];
+  //gRightEyeMatrix.columns[3][2] = view_mat_r.columns[3][2] - view_mat_l.columns[3][2];
+  //leftView->transform.columns[3][1] += 2.0;
+  //rightView->transform.columns[3][1] += 2.0;
+
+  view_mat_l.columns[3][1] -= 1.5;
+  view_mat_r.columns[3][1] -= 1.5;
+  
+  for (int i = 0; i < 0x20; i += 4)
+  {
+    //printf("%x: %x %x %x %x\n", i, leftView->unknown[i+0], leftView->unknown[i+1], leftView->unknown[i+2], leftView->unknown[i+3]);
+  }
+  
+  
 
   //float fovAngleHorizontal = 108 * M_PI / 180;
   //float fovAngleVertical = CalculateFovY(fovAngleHorizontal, 2732 / 2048.f);
@@ -153,6 +283,26 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
   leftView->tangents = tangents_l;
   rightView->tangents = tangents_r;
+
+  if (xr_data.tangents_l)
+  {
+    simd_float4 tangents_l = simd_make_float4(tanf(-xr_data.tangents_l[0]), tanf(xr_data.tangents_l[1]),
+                                              tanf(xr_data.tangents_l[2]), tanf(-xr_data.tangents_l[3]));
+    leftView->tangents = tangents_l;
+  }
+  
+  if (xr_data.tangents_r)
+  {
+    simd_float4 tangents_r = simd_make_float4(tanf(-xr_data.tangents_r[0]), tanf(xr_data.tangents_r[1]),
+                                              tanf(xr_data.tangents_r[2]), tanf(-xr_data.tangents_r[3]));
+    rightView->tangents = tangents_r;
+  }
+
+  leftView->transform = view_mat_l;
+  rightView->transform = view_mat_r;
+  //leftView->transform = gIdentityMat;
+  //rightView->transform = gRightEyeMatrix;
+
   return retval;
 }
 
@@ -162,11 +312,12 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
   if (gHookedDrawable == drawable) {
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      DumpScreenshot();
+      //DumpScreenshot();
     }];
   }
 
   //NSLog(@"visionos_stereo_screenshot: present");
+  openxr_set_textures(gHookedRealTexture, gHookedExtraTexture, gHookedExtraTexture.width, gHookedExtraTexture.height);
   openxr_loop();
 
   return cp_drawable_encode_present(drawable, command_buffer);

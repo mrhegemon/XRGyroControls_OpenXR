@@ -132,7 +132,7 @@ glm::mat4 util::poseToMatrix(const XrPosef& pose)
   const glm::mat4 rotation =
     glm::toMat4(glm::quat(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z));
 
-  return glm::inverse(translation * rotation);
+  return translation * rotation;
 }
 
 glm::mat4 util::createProjectionMatrix(XrFovf fov, float nearClip, float farClip)

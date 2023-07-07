@@ -13,13 +13,16 @@ public:
                 VkPhysicalDevice physicalDevice,
                 VkCommandPool commandPool,
                 VkDescriptorPool descriptorPool,
-                VkDescriptorSetLayout descriptorSetLayout);
+                VkDescriptorSetLayout descriptorSetLayout,
+                VkImageView textureImageView,
+                VkSampler textureSampler,
+                VkImageView textureImageView2,
+                VkSampler textureSampler2);
   ~RenderProcess();
 
   struct UniformBufferData final
   {
     glm::mat4 world;
-    //glm::mat4 tracked_points[64];
     glm::mat4 viewProjection[2];
   } uniformBufferData;
 

@@ -12,6 +12,7 @@
 #include <mach-o/nlist.h>
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
+#include <glm/gtc/type_ptr.hpp>
 
 extern "C"
 {
@@ -98,6 +99,10 @@ int libusb_test_main(void)
 }
 }
 
+MTLTexture_id g_tex_l;
+MTLTexture_id g_tex_r;
+uint32_t g_tex_w = 0;
+uint32_t g_tex_h = 0;
 Context* context = nullptr;
 Headset* headset = nullptr;
 Renderer* renderer = nullptr;
@@ -176,7 +181,7 @@ extern "C" int openxr_init()
 
   printf("XRHax: create Renderer!\n");
 
-  renderer = new Renderer(context, headset);
+  renderer = new Renderer(context, headset, g_tex_l, g_tex_r, g_tex_w, g_tex_h);
   if (!renderer || !renderer->isValid())
   {
     printf("XRHax: create Renderer failed!\n");
@@ -186,6 +191,29 @@ extern "C" int openxr_init()
   printf("XRHax: OpenXR init success!\n");
 
   return EXIT_SUCCESS;
+}
+
+extern "C" int openxr_set_textures(MTLTexture_id tex_l, MTLTexture_id tex_r, uint32_t w, uint32_t h)
+{
+  g_tex_l = tex_l;
+  g_tex_r = tex_r;
+  g_tex_w = w;
+  g_tex_h = h;
+
+  if (!context || !context->isValid()) {
+    if(openxr_init() != EXIT_SUCCESS) {
+      openxr_is_done = 1;
+      return 1;
+    }
+  }
+
+  if (!renderer) return 1;
+
+  renderer->metal_tex_l = g_tex_l;
+  renderer->metal_tex_r = g_tex_r;
+  renderer->metal_tex_w = g_tex_w;
+  renderer->metal_tex_h = g_tex_h;
+  return 0;
 }
 
 extern "C" int openxr_loop()
@@ -249,17 +277,38 @@ extern "C" int openxr_cleanup()
 
 extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 {
+  if (!out) return;
+  out->view_l = NULL;
+  out->view_r = NULL;
+  out->proj_l = NULL;
+  out->proj_r = NULL;
+  out->tangents_l = NULL;
+  out->tangents_r = NULL;
   if (!headset) return;
 
   const XrView& eyePose0 = headset->eyePoses.at(0);
   const XrView& eyePose1 = headset->eyePoses.at(1);
 
-  out->x = (eyePose0.pose.position.x + eyePose1.pose.position.x) / 2.0;
-  out->y = (eyePose0.pose.position.y + eyePose1.pose.position.y) / 2.0;
-  out->z = (eyePose0.pose.position.z + eyePose1.pose.position.z) / 2.0;
+  out->l_x  = eyePose0.pose.position.x;
+  out->l_y  = eyePose0.pose.position.y;
+  out->l_z  = eyePose0.pose.position.z;
+  out->l_qx = eyePose0.pose.orientation.x;
+  out->l_qy = eyePose0.pose.orientation.y;
+  out->l_qz = eyePose0.pose.orientation.z;
+  out->l_qw = eyePose0.pose.orientation.w;
 
-  out->qx = eyePose0.pose.orientation.x;
-  out->qy = eyePose0.pose.orientation.y;
-  out->qz = eyePose0.pose.orientation.z;
-  out->qw = eyePose0.pose.orientation.w;
+  out->r_x  = eyePose1.pose.position.x;
+  out->r_y  = eyePose1.pose.position.y;
+  out->r_z  = eyePose1.pose.position.z;
+  out->r_qx = eyePose1.pose.orientation.x;
+  out->r_qy = eyePose1.pose.orientation.y;
+  out->r_qz = eyePose1.pose.orientation.z;
+  out->r_qw = eyePose1.pose.orientation.w;
+
+  out->view_l = glm::value_ptr(headset->eyeViewMatrices.at(0));
+  out->view_r = glm::value_ptr(headset->eyeViewMatrices.at(1));
+  out->proj_l = glm::value_ptr(headset->eyeProjectionMatrices.at(0));
+  out->proj_r = glm::value_ptr(headset->eyeProjectionMatrices.at(1));
+  out->tangents_l = headset->eyeTangents_l;
+  out->tangents_r = headset->eyeTangents_r;
 }

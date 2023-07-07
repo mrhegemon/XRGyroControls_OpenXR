@@ -715,6 +715,19 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     const XrPosef& pose = eyeRenderInfo.pose;
     eyeViewMatrices.at(eyeIndex) = util::poseToMatrix(pose);
     eyeProjectionMatrices.at(eyeIndex) = util::createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
+    if (eyeIndex == 0)
+    {
+      eyeTangents_l[0] = eyeRenderInfo.fov.angleLeft;
+      eyeTangents_l[1] = eyeRenderInfo.fov.angleRight;
+      eyeTangents_l[2] = eyeRenderInfo.fov.angleUp;
+      eyeTangents_l[3] = eyeRenderInfo.fov.angleDown;
+    }
+    else {
+      eyeTangents_r[0] = eyeRenderInfo.fov.angleLeft;
+      eyeTangents_r[1] = eyeRenderInfo.fov.angleRight;
+      eyeTangents_r[2] = eyeRenderInfo.fov.angleUp;
+      eyeTangents_r[3] = eyeRenderInfo.fov.angleDown;
+    }
   }
 
   // Acquire the swapchain image
