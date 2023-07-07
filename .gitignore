@@ -107,3 +107,11 @@ XRGyroControls.simdeviceui/Contents/MacOS
 .DS_Store
 *.dylib
 *.png
+openxr_monado-dev.json
+libusb/
+libusb_/
+junk/
+build_/
+a.out
+shaders/
+test_dlopen.c

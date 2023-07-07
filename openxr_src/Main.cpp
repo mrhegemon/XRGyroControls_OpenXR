@@ -131,7 +131,9 @@ extern "C" int openxr_init()
   //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
 
 #if 1
-  const char* pszModule = "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/IOUSBLib_ios_hax.dylib";
+  char tmp[1024];
+  snprintf(tmp, sizeof(tmp), "%s/IOUSBLib_ios_hax.dylib", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
+  const char* pszModule = tmp;
   void* h = dlopen(pszModule, RTLD_GLOBAL);
   if (h == NULL)
   {

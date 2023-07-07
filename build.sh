@@ -76,7 +76,7 @@ function fixup_dependency ()
 
 # *slow chanting* hacks, hacks, HACKS **HACKS**
 fixup_dependency libXRGyroControls.dylib /opt/homebrew/lib/libopenxr_loader.dylib
-fixup_dependency libXRGyroControls.dylib /Users/maxamillion/workspace/monado/build/src/xrt/targets/openxr/libopenxr_monado.dylib
+fixup_dependency libXRGyroControls.dylib $MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib
 fixup_dependency libXRGyroControls.dylib $VULKAN_SDK/lib/libvulkan.1.dylib
 fixup_dependency libXRGyroControls.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
 fixup_dependency libXRGyroControls.dylib /opt/homebrew/opt/glfw/lib/libglfw.3.dylib

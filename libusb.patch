@@ -1,5 +1,5 @@
 diff --git a/examples/listdevs.c b/examples/listdevs.c
-index b5a9494c..7e4250a3 100644
+index b5a9494..7e4250a 100644
 --- a/examples/listdevs.c
 +++ b/examples/listdevs.c
 @@ -60,6 +60,7 @@ int main(void)
@@ -11,7 +11,7 @@ index b5a9494c..7e4250a3 100644
  		libusb_exit(NULL);
  		return (int) cnt;
 diff --git a/libusb/os/darwin_usb.c b/libusb/os/darwin_usb.c
-index 574b7bb5..084d4581 100644
+index 574b7bb..2438b55 100644
 --- a/libusb/os/darwin_usb.c
 +++ b/libusb/os/darwin_usb.c
 @@ -31,6 +31,7 @@
@@ -22,7 +22,7 @@ index 574b7bb5..084d4581 100644
  
  #include <mach/mach_time.h>
  
-@@ -295,6 +296,254 @@ static bool get_ioregistry_value_data (io_service_t service, CFStringRef propert
+@@ -295,6 +296,256 @@ static bool get_ioregistry_value_data (io_service_t service, CFStringRef propert
    return success;
  }
  
@@ -61,7 +61,7 @@ index 574b7bb5..084d4581 100644
 +    CFStringRef   pluginName;
 +    boolean_t   matches;
 +    kern_return_t kr = kIOReturnSuccess;
-+    
++
 +    // -- loadables
 +    onePlugin     = NULL;
 +    pluginName    = NULL;
@@ -158,7 +158,9 @@ index 574b7bb5..084d4581 100644
 +    if (!IOUSBLibFactory) {
 +      printf("IOUSBLibFactory is null! %p\n", IOUSBLibFactory);
 +
-+      const char* pszModule = "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/IOUSBLib_ios_macos.dylib";
++      char tmp[1024];
++      snprintf(tmp, sizeof(tmp), "%s/IOUSBLib_ios_hax.dylib", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
++      const char* pszModule = tmp;
 +      //const char* pszModule = "/System/Library/Extensions/IOUSBHostFamily.kext/Contents/PlugIns/IOUSBLib.bundle/Contents/MacOS/IOUSBLib";
 +      if (!dlopen(pszModule, RTLD_GLOBAL)) {
 +        printf("Failed to dlopen %s.  %s\n", pszModule, dlerror() );
@@ -194,10 +196,10 @@ index 574b7bb5..084d4581 100644
 +    // allocate and Probe all
 +    if (candidates && scores) {
 +        CFIndex numfactories = CFArrayGetCount(factories);
-+        for ( index = 0; index < numfactories; index++ ) 
++        for ( index = 0; index < numfactories; index++ )
 +        {
 +            IUnknownVTbl **       iunknown;
-+    
++
 +            //factoryID = (CFUUIDRef) CFArrayGetValueAtIndex(factories, index);
 +            //iunknown = (IUnknownVTbl **)
 +            //    CFPlugInInstanceCreate(NULL, factoryID, pluginType);
@@ -208,10 +210,10 @@ index 574b7bb5..084d4581 100644
 +            }
 +            (*iunknown)->QueryInterface(iunknown, CFUUIDGetUUIDBytes(interfaceType),
 +                                (LPVOID *)&interface);
-+    
++
 +            // Now we are done with IUnknown interface
 +            (*iunknown)->Release(iunknown);
-+    
++
 +            if (!interface) {
 +    //            printf("Failed to get interface.\n");
 +                continue;
@@ -220,7 +222,7 @@ index 574b7bb5..084d4581 100644
 +                plist = (CFDictionaryRef) CFArrayGetValueAtIndex( plists, index );
 +            score = 0;   // from property table
 +            kr = (*interface)->Probe(interface, plist, service, &score);
-+    
++
 +            if (kIOReturnSuccess == kr) {
 +                CFIndex numscores = CFArrayGetCount(scores);
 +                for (insert = 0; insert < numscores; insert++) {
@@ -277,7 +279,7 @@ index 574b7bb5..084d4581 100644
  static usb_device_t **darwin_device_from_service (struct libusb_context *ctx, io_service_t service)
  {
    io_cf_plugin_ref_t *plugInInterface = NULL;
-@@ -307,7 +556,7 @@ static usb_device_t **darwin_device_from_service (struct libusb_context *ctx, io
+@@ -307,7 +558,7 @@ static usb_device_t **darwin_device_from_service (struct libusb_context *ctx, io
       an "out of resources" error with certain USB devices the first time we run 
       it. The reason is still unclear, but retrying fixes the problem */
    for (int count = 0; count < max_retries; count++) {
@@ -286,7 +288,7 @@ index 574b7bb5..084d4581 100644
                                                  kIOCFPlugInInterfaceID, &plugInInterface,
                                                  &score);
      if (kIOReturnSuccess == kresult && plugInInterface) {
-@@ -1511,7 +1760,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
+@@ -1511,7 +1762,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
    }
  
    /* get an interface to the device's interface */
@@ -296,7 +298,7 @@ index 574b7bb5..084d4581 100644
  
    /* ignore release error */
 diff --git a/libusb/os/darwin_usb.h b/libusb/os/darwin_usb.h
-index 7b72fffb..c8eb179b 100644
+index 7b72fff..c8eb179 100644
 --- a/libusb/os/darwin_usb.h
 +++ b/libusb/os/darwin_usb.h
 @@ -36,6 +36,123 @@
