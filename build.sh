@@ -121,3 +121,6 @@ codesign -s - libopenxr_loader.dylib --force --deep --verbose
 codesign -s - libopenxr_monado.dylib --force --deep --verbose
 codesign -s - libvulkan.1.dylib --force --deep --verbose
 codesign -s - libXRGyroControls.dylib --force --deep --verbose
+
+# Fixup monado JSON
+gsed "s|REPLACE_ME|$PWD|g" openxr_monado-dev.json.template > openxr_monado-dev.json
