@@ -8,9 +8,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows OR CMAKE_SYSTEM_NAME STREQUAL Darwin)
   option(BUILD_SHARED_LIBS "Build shared libraries by default" YES)
 endif()
 
-#set(CMAKE_OSX_SYSROOT "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk")
-#set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${PROJECT_SOURCE_DIR}/openxr-Bridging-Header.h")  
-
 find_package(OpenGL REQUIRED)
 find_package(GLEW 2.0 REQUIRED)
 find_package(VULKAN REQUIRED Vulkan::Vulkan)
@@ -88,7 +85,7 @@ target_link_libraries(OpenXRCpp PRIVATE m glm)
 target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} m glm)
 
 # TODO handle this better?
-target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/openxr/libopenxr_monado.dylib)
+target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib)
 target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib)
 
 target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS}  $ENV{VULKAN_SDK}/include)
