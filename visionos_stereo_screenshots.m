@@ -221,8 +221,14 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   //leftView->transform.columns[3][1] += 2.0;
   //rightView->transform.columns[3][1] += 2.0;
 
-  view_mat_l.columns[3][1] -= 1.5;
-  view_mat_r.columns[3][1] -= 1.5;
+  printf("%f\n", gWorldMat.columns[3][1]);
+
+  if (gWorldMat.columns[3][1] < 0.0) {
+
+  }
+
+  //view_mat_l.columns[3][1] -= gWorldMat.columns[3][1];
+  //view_mat_r.columns[3][1] -= gWorldMat.columns[3][1];
   
   for (int i = 0; i < 0x20; i += 4)
   {

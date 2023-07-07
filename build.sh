@@ -6,8 +6,20 @@ PWD=$(pwd)
 # Monado build config
 #cmake .. -DXRT_ENABLE_GPL=1 -DXRT_BUILD_DRIVER_EUROC=0 -DXRT_BUILD_DRIVER_NS=0 -DXRT_BUILD_DRIVER_PSVR=0 -DXRT_HAVE_OPENCV=0 -DXRT_HAVE_XCB=0 -DXRT_HAVE_XLIB=0 -DXRT_HAVE_XRANDR=0 -DXRT_HAVE_SDL2=0  -DXRT_HAVE_VT=0 -DXRT_FEATURE_WINDOW_PEEK=0 -DXRT_BUILD_DRIVER_QWERTY=0
 
+if ! [[ -d "libusb" ]]; then
+    mkdir -p libusb
+    pushd libusb
+    git init
+    git remote add origin https://github.com/libusb/libusb.git
+    git fetch --depth 1 origin 8450cc93f6c8747a36a9ee246708bf650bb762a8
+    git checkout FETCH_HEAD
+    git apply --whitespace=fix ../libusb.patch
+    ./bootstrap.sh
+    ./configure
+    popd
+fi
+
 pushd libusb
-#./bootstrap.sh
 make
 retVal=$?
 if [ $retVal -ne 0 ]; then
@@ -26,8 +38,7 @@ fi
 # Compile all the shaders
 mkdir -p shaders && cp openxr_src/shaders/* shaders/ && cd $PWD && \
 glslc --target-env=vulkan1.2 $PWD/shaders/Basic.vert -std=450core -O -o $PWD/shaders/Basic.vert.spv && \
-glslc --target-env=vulkan1.2 $PWD/shaders/Cube.frag -std=450core -O -o $PWD/shaders/Cube.frag.spv && \
-glslc --target-env=vulkan1.2 $PWD/shaders/Grid.frag -std=450core -O -o $PWD/shaders/Grid.frag.spv
+glslc --target-env=vulkan1.2 $PWD/shaders/Rect.frag -std=450core -O -o $PWD/shaders/Rect.frag.spv
 
 cp build/libXRGyroControls.dylib libXRGyroControls.dylib
 

@@ -25,7 +25,7 @@ struct Vertex final
 };
 
 constexpr std::array vertices = {
-  // Cube front left
+  // framebuffer rect
   Vertex{{ -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}}, Vertex{{ -1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 1.0f}},
   Vertex{{ +1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, {1.0f, 0.0f}}, Vertex{{ +1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, {1.0f, 1.0f}},
 };
@@ -612,7 +612,7 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
     }
   }
 
-  // Create the grid pipeline
+  // Create the rect pipeline
   VkVertexInputBindingDescription vertexInputBindingDescription;
   vertexInputBindingDescription.binding = 0u;
   vertexInputBindingDescription.stride = sizeof(Vertex);
@@ -636,38 +636,24 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
   vertexInputAttributeDescriptionUV.format = VK_FORMAT_R32G32_SFLOAT;
   vertexInputAttributeDescriptionUV.offset = offsetof(Vertex, uv);
 
-  gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Basic.vert.spv",
-                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Grid.frag.spv", { vertexInputBindingDescription },
+  char tmp1[1024];
+  char tmp2[1024];
+
+  snprintf(tmp1, sizeof(tmp1), "%s/shaders/Basic.vert.spv", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
+  tmp1[sizeof(tmp1)-1] = 0;
+
+  snprintf(tmp2, sizeof(tmp2), "%s/shaders/Rect.frag.spv", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
+  tmp2[sizeof(tmp2)-1] = 0;
+
+  // Create the rect pipeline
+  rectPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), tmp1,
+                              tmp2, { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor, vertexInputAttributeDescriptionUV });
-  if (!gridPipeline->isValid())
+  if (!rectPipeline->isValid())
   {
     valid = false;
     return;
   }
-
-  // Create the cube pipeline
-  cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Basic.vert.spv",
-                              "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/shaders/Cube.frag.spv", { vertexInputBindingDescription },
-                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor, vertexInputAttributeDescriptionUV });
-  if (!cubePipeline->isValid())
-  {
-    valid = false;
-    return;
-  }
-
-  /*for (int i = 0; i < 64; i++) {
-    char tmp[256];
-    snprintf(tmp, 256, "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Pt%u.vert.spv", i);
-    // Create the cube pipeline
-    trackedPipeline[i] = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), tmp,
-                                "/Users/maxamillion/workspace/XRGyroControls_OpenXR/shaders/Cube.frag.spv", { vertexInputBindingDescription },
-                                { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor, vertexInputAttributeDescriptionUV });
-    if (!trackedPipeline[i]->isValid())
-    {
-      valid = false;
-      return;
-    }
-  }*/
 
   // Create a vertex buffer
   {
@@ -742,8 +728,7 @@ Renderer::~Renderer()
 {
   delete indexBuffer;
   delete vertexBuffer;
-  delete cubePipeline;
-  delete gridPipeline;
+  delete rectPipeline;
 
   const VkDevice vkDevice = context->getVkDevice();
 
@@ -866,19 +851,9 @@ void Renderer::render(size_t swapchainImageIndex)
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
                           nullptr);
 
-  // Draw the grid
-  //gridPipeline->bind(commandBuffer);
-  //vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
-
-  // Draw the cube
-  cubePipeline->bind(commandBuffer);
+  // Draw the rect
+  rectPipeline->bind(commandBuffer);
   vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
-
-  // Draw the lhand cube
-  /*for (int i = 0; i < 64; i++) {
-    trackedPipeline[i]->bind(commandBuffer);
-    vkCmdDrawIndexed(commandBuffer, 36u, 1u, 6u, 0u, 0u);
-  }*/
 
   vkCmdEndRenderPass(commandBuffer);
 }
