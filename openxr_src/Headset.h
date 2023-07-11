@@ -9,6 +9,7 @@
 #include <openxr/openxr_platform.h>
 
 #include <vector>
+#include <mutex>
 
 class Context;
 class RenderTarget;
@@ -73,6 +74,8 @@ public:
   std::vector<glm::mat4> eyeProjectionMatrices;
   float eyeTangents_l[4];
   float eyeTangents_r[4];
+
+  std::mutex eyePoseMutex;
 
 private:
   bool valid = true;

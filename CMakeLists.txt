@@ -17,6 +17,9 @@ INCLUDE(FindPkgConfig)
 pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
 #PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 
 add_library(OpenXRCpp STATIC
   openxr_src/Buffer.cpp
@@ -49,7 +52,7 @@ add_library(XRGyroControls
   visionos_stereo_screenshots.m
 )
 #target_link_libraries(OpenXRCpp PRIVATE -framework Metal -framework CompositorServices)
-target_link_options(XRGyroControls PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F)
+target_link_options(XRGyroControls PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator)
 
 set_source_files_properties(visionos_stereo_screenshots.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc -isysroot \"/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk\"")
 
@@ -86,6 +89,6 @@ target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} 
 
 # TODO handle this better?
 target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/openxr/libopenxr_monado.dylib)
-target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib)
+target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib Threads::Threads)
 
 target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS}  $ENV{VULKAN_SDK}/include)

@@ -41,6 +41,7 @@ typedef void* MTLTexture_id;
 #endif
 
 int openxr_main();
+int openxr_pre_loop();
 int openxr_loop();
 int openxr_cleanup();
 int openxr_done();

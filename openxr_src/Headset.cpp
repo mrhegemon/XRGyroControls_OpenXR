@@ -681,6 +681,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     //return BeginFrameResult::SkipRender;
   }
 
+  //std::lock_guard<std::mutex> guard(eyePoseMutex);
+
   // Update the eye poses
   viewState.type = XR_TYPE_VIEW_STATE;
   uint32_t viewCount;

@@ -13,6 +13,12 @@
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <chrono>
+#include <thread>
+
+uint32_t swapchainImageIndex;
+int frame_started = 0;
+
 
 extern "C"
 {
@@ -107,6 +113,9 @@ Context* context = nullptr;
 Headset* headset = nullptr;
 Renderer* renderer = nullptr;
 int openxr_is_done = 0;
+std::thread* render_thread;
+
+ std::chrono::time_point<std::chrono::high_resolution_clock> last_loop;
 
 #define DO_MIRROR
 
@@ -121,6 +130,18 @@ extern "C" int openxr_main()
   return 0;
 }
 
+extern "C" void render_loop()
+{
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+  while (1)
+  {
+    openxr_pre_loop();
+    openxr_loop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
 
 extern "C" int openxr_init()
 {
@@ -129,6 +150,8 @@ extern "C" int openxr_init()
   stdout->_write = stdout_redirect_nslog;
   stderr->_write = stderr_redirect_nslog;
   //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
+
+  frame_started = 0;
 
 #if 1
   char tmp[1024];
@@ -192,6 +215,8 @@ extern "C" int openxr_init()
 
   printf("XRHax: OpenXR init success!\n");
 
+  render_thread = new std::thread(render_loop);
+
   return EXIT_SUCCESS;
 }
 
@@ -218,7 +243,7 @@ extern "C" int openxr_set_textures(MTLTexture_id tex_l, MTLTexture_id tex_r, uin
   return 0;
 }
 
-extern "C" int openxr_loop()
+extern "C" int openxr_pre_loop()
 {
   //printf("XRHax: OpenXR loop start\n");
   if (!context || !context->isValid()) {
@@ -234,24 +259,63 @@ extern "C" int openxr_loop()
     return 1;
   }
 
-  uint32_t swapchainImageIndex;
+  if (frame_started) {
+    return 0;
+  }
+
   const Headset::BeginFrameResult frameResult = headset->beginFrame(swapchainImageIndex);
   if (frameResult == Headset::BeginFrameResult::Error)
   {
     openxr_is_done = 1;
     return 1;
   }
-  else if (frameResult == Headset::BeginFrameResult::RenderFully)
+
+  frame_started = 1;
+
+  return 0;
+}
+
+extern "C" int openxr_loop()
+{
+  if (!context || !context->isValid()) {
+    if(openxr_init() != EXIT_SUCCESS) {
+      openxr_is_done = 1;
+      return 1;
+    }
+  }
+
+  // Main loop
+  if (headset->isExitRequested()) {
+    openxr_is_done = 1;
+    return 1;
+  }
+
+  static int throttle_prints = 0;
+  auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
+  long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  if (++throttle_prints > 240) {
+    printf("%zu microseconds loop\n", (size_t)microseconds);
+    throttle_prints = 0;
+  }
+
+  last_loop = std::chrono::high_resolution_clock::now();
+
+  if (!frame_started) return 0;
+
+  //else if (frameResult == Headset::BeginFrameResult::RenderFully)
   {
     renderer->render(swapchainImageIndex);
     renderer->submit(false);
   }
 
-  if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
+  //if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
   {
     headset->endFrame();
   }
   //printf("XRHax: OpenXR loop done\n");
+
+  frame_started = 0;
+  
 
   //context.sync(); // Sync before destroying so that resources are free
   return 0;
@@ -287,6 +351,8 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->tangents_l = NULL;
   out->tangents_r = NULL;
   if (!headset) return;
+
+  //std::lock_guard<std::mutex> guard(headset->eyePoseMutex);
 
   const XrView& eyePose0 = headset->eyePoses.at(0);
   const XrView& eyePose1 = headset->eyePoses.at(1);
