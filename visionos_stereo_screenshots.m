@@ -35,6 +35,11 @@ static simd_float4x4 gWorldMat = {.columns = {
                                             {0, 2.0, 0, 1},
                                         }};
 
+static simd_float4 left_eye_pos;
+static simd_float4 left_eye_quat;
+static simd_float4 right_eye_pos;
+static simd_float4 right_eye_quat;
+
 // cp_drawable_get_view
 struct cp_view {
   simd_float4x4 transform;     // 0x0
@@ -61,6 +66,11 @@ struct cp_view_texture_map {
   size_t texture_index;  // 0x0
   size_t slice_index;    // 0x8
   MTLViewport viewport;  // 0x10
+};
+
+struct RSSimulatedHeadsetPose {
+  simd_float4 position;
+  simd_float4 rotation;
 };
 
 static const int kTakeScreenshotStatusIdle = 0;
@@ -277,12 +287,27 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   // X is -left/+right
   // Y is +up/-down
   // Z is -forward/+back
-  /*leftView->transform.columns[3][0] = xr_data.l_x;
-  leftView->transform.columns[3][1] = xr_data.l_y;
-  leftView->transform.columns[3][2] = xr_data.l_z * 2.0;
-  leftView->transform.columns[3][3] = 0.0;
+  left_eye_pos[0] = xr_data.l_x;
+  left_eye_pos[1] = xr_data.l_y;
+  left_eye_pos[2] = xr_data.l_z;
+  left_eye_pos[3] = 0.0;
 
-  rightView->transform.columns[3][0] = xr_data.r_x;
+  left_eye_quat[0] = xr_data.l_qx;
+  left_eye_quat[1] = xr_data.l_qy;
+  left_eye_quat[2] = xr_data.l_qz;
+  left_eye_quat[3] = xr_data.l_qw;
+
+  right_eye_pos[0] = xr_data.r_x;
+  right_eye_pos[1] = xr_data.r_y;
+  right_eye_pos[2] = xr_data.r_z;
+  right_eye_pos[3] = 0.0;
+
+  right_eye_quat[0] = xr_data.r_qx;
+  right_eye_quat[1] = xr_data.r_qy;
+  right_eye_quat[2] = xr_data.r_qz;
+  right_eye_quat[3] = xr_data.r_qw;
+
+  /*rightView->transform.columns[3][0] = xr_data.r_x;
   rightView->transform.columns[3][1] = xr_data.r_y;
   rightView->transform.columns[3][2] = xr_data.r_z * 2.0;
   rightView->transform.columns[3][3] = 0.0;*/
@@ -444,6 +469,11 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
     }];
   }
 
+  id<MTLBlitCommandEncoder> blit = [command_buffer blitCommandEncoder];
+  [blit copyFromTexture:gHookedLeftTexture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture.width, gHookedLeftTexture.height, 1) toTexture:gHookedSimulatorPreviewTexture destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
+  [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture];
+  [blit endEncoding];
+
   //openxr_complete_renderframe();
 
   //NSLog(@"visionos_stereo_screenshot: present");
@@ -456,6 +486,17 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
 }
 
 DYLD_INTERPOSE(hook_cp_drawable_encode_present, cp_drawable_encode_present);
+
+int RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose);
+int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose) {
+  int ret = RCPHIDEventGetSelectionRay(ctx, pose);
+  //pose->position = left_eye_pos;
+  //pose->rotation = left_eye_quat;
+
+  printf("selection ray %u, %f %f %f %f\n", ret, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);
+  return ret;
+}
+DYLD_INTERPOSE(hook_RCPHIDEventGetSelectionRay, RCPHIDEventGetSelectionRay);
 
 void cp_drawable_present(cp_drawable_t drawable);
 static void hook_cp_drawable_present(cp_drawable_t drawable) {
@@ -642,6 +683,61 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   return 120;
 }
 
+@interface RSSimulatedHeadset
+- (void)getEyePose:(struct RSSimulatedHeadsetPose*)pose:(int)forEye;
+- (void)setEyePose:(struct RSSimulatedHeadsetPose)pose:(int)forEye;
+@end
+
+static void (*real_RSSimulatedHeadset_getEyePose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose* pose, int forEye);
+static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel,
+                                               struct RSSimulatedHeadsetPose* pose, int forEye) {
+  real_RSSimulatedHeadset_getEyePose(self, sel, pose, forEye);
+  
+  /*if (forEye == 0)
+  {
+    pose->position = left_eye_pos;
+    pose->rotation = left_eye_quat;
+  }
+  else if (forEye == 1)
+  {
+    pose->position = right_eye_pos;
+    pose->rotation = right_eye_quat;
+  }
+  else if (forEye == 2)
+  {
+    pose->position = left_eye_pos;
+    pose->rotation = left_eye_quat;
+  }
+  
+  printf("get eye pos %u, %f %f %f %f\n", forEye, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);*/
+}
+
+static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose pose, int forEye);
+static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel,
+                                               struct RSSimulatedHeadsetPose pose, int forEye) {
+  if (forEye == 0)
+  {
+    pose.position = left_eye_pos;
+    pose.rotation = left_eye_quat;
+  }
+  else if (forEye == 1)
+  {
+    pose.position = right_eye_pos;
+    pose.rotation = right_eye_quat;
+  }
+  else if (forEye == 2)
+  {
+    pose.position = left_eye_pos;
+    pose.rotation = left_eye_quat;
+  }
+
+  real_RSSimulatedHeadset_setEyePose(self, sel, pose, forEye);
+  
+  //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
+}
+
 __attribute__((constructor)) static void SetupSignalHandler() {
   NSLog(@"visionos_stereo_screenshots starting!");
   static dispatch_queue_t signal_queue;
@@ -669,6 +765,20 @@ __attribute__((constructor)) static void SetupSignalHandler() {
 #endif
 
   {
+    Class cls = NSClassFromString(@"RSSimulatedHeadset");
+    Method method = class_getInstanceMethod(cls, @selector(_getEyePose:forEye:));
+    real_RSSimulatedHeadset_getEyePose = (void*)method_getImplementation(method);
+    method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_getEyePose);
+  }
+
+  {
+    Class cls = NSClassFromString(@"RSSimulatedHeadset");
+    Method method = class_getInstanceMethod(cls, @selector(setEyePose:forEye:));
+    real_RSSimulatedHeadset_setEyePose = (void*)method_getImplementation(method);
+    method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setEyePose);
+  }
+
+  {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
     Method method = class_getInstanceMethod(cls, @selector(currentFrequency));
     real_RSXRRenderLoop_currentFrequency = (void*)method_getImplementation(method);
@@ -677,41 +787,6 @@ __attribute__((constructor)) static void SetupSignalHandler() {
 
   //openxr_main();
 }
-
-void __attribute__ ((constructor)) premain(void) {
-#ifdef __x86_64__
-    register void* r15 asm("r15");  //dyld4::gDyld
-    register void* (*typed_dlopen)( void*, char const*, int) asm("rax");
-    register void* (*typed_dlsym)(void*, char const*, void*) asm("rcx");
-    __asm volatile(".intel_syntax noprefix;"
-                   "mov rax,[r15];"
-                   "mov rcx,[rax + 0x88];"
-                   "mov rax,[rax + 0x70];"
-                   : "=r"(typed_dlopen), "=r"(r15), "=r"(typed_dlsym)); //dyld4::gDyld
-    void* handle = typed_dlopen(r15, "libc.dylib", RTLD_NOW);
-    int (*myPrintf)(const char * __restrict, ...) = typed_dlsym(r15, handle, "printf");
-
-    myPrintf("Hello world");
-#endif
-#if TARGET_CPU_ARM64
-    register void* x8 asm("x8");  //dyld4::gDyld
-    register void* (*typed_dlopen)( void*, char const*, int) asm("x0");
-    register void* (*typed_dlsym)(void*, char const*, void*) asm("x1");
-
-    __asm volatile("ldr x0,[x8] \t\n"
-                   "ldr x1,[x0, 0x88]\t\n"
-                   "ldr x0,[x0, 0x70]\t\n"
-                   : "=r"(typed_dlopen), "=r"(x8), "=r"(typed_dlsym)); //dyld4::gDyld
-
-    void* handle = typed_dlopen(x8, "libc.dylib", RTLD_NOW);
-    int (*myPrintf)(const char * __restrict, ...) = typed_dlsym(x8, handle, "printf");
-    void* searched_dlopen = typed_dlsym(x8, handle, "dlopen");
-
-    myPrintf("Hello world");
-
-    NSLog(@"stdout typed_dlopen %p dlopen %p searched_dlopen %p handle %p", typed_dlopen, dlopen, searched_dlopen, handle);
-#endif
-} 
 
 int redirect_nslog(const char *prefix, const char *buffer, int size)
 {

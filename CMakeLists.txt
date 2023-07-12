@@ -20,6 +20,9 @@ pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+# SimulatorKit framework
+add_library(SimulatorKit SimulatorKit/SimulatorKit.swift)
+target_compile_options(SimulatorKit PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator)
 
 add_library(OpenXRCpp STATIC
   openxr_src/Buffer.cpp
@@ -48,15 +51,15 @@ add_library(Dummy
 )
 
 # Main library
-add_library(XRGyroControls 
+add_library(Sim2OpenXR 
   visionos_stereo_screenshots.m
 )
 #target_link_libraries(OpenXRCpp PRIVATE -framework Metal -framework CompositorServices)
-target_link_options(XRGyroControls PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator)
+target_link_options(Sim2OpenXR PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator -Wl,-U,_RCPHIDEventGetSelectionRay)
 
 set_source_files_properties(visionos_stereo_screenshots.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc -isysroot \"/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk\"")
 
-set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(Sim2OpenXR PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
 # First try openxr.pc from OpenXR SDK
 include(FindPkgConfig)
@@ -64,7 +67,7 @@ pkg_search_module(OPENXR openxr)
 if (OPENXR_FOUND)
   MESSAGE("OpenXR found with pkg-config")
   target_link_libraries(OpenXRCpp PRIVATE ${OPENXR_LINK_LIBRARIES})
-  target_link_libraries(XRGyroControls PRIVATE ${OPENXR_LINK_LIBRARIES})
+  target_link_libraries(Sim2OpenXR PRIVATE ${OPENXR_LINK_LIBRARIES})
   MESSAGE("${OPENXR_LIBRARIES}")
 
 # Second, try OpenXRConfig.cmake from OpenXR SDK
@@ -81,14 +84,26 @@ else()
 
   target_include_directories(OpenXRCpp PRIVATE ${OpenXR_INCLUDE_DIR})
   target_link_libraries(OpenXRCpp PRIVATE OpenXR::openxr_loader)
-  target_link_libraries(XRGyroControls PRIVATE OpenXR::openxr_loader)
+  target_link_libraries(Sim2OpenXR PRIVATE OpenXR::openxr_loader)
 endif()
 
 target_link_libraries(OpenXRCpp PRIVATE m glm)
-target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} m glm)
+target_link_libraries(Sim2OpenXR PRIVATE OpenXRCpp ${GLEW_STATIC_LIBRARIES} m glm)
 
 # TODO handle this better?
-target_link_libraries(XRGyroControls PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/openxr/libopenxr_monado.dylib)
-target_link_libraries(XRGyroControls PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib Threads::Threads)
+target_link_libraries(Sim2OpenXR PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/openxr/libopenxr_monado.dylib)
+target_link_libraries(Sim2OpenXR PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib Threads::Threads)
 
 target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS}  $ENV{VULKAN_SDK}/include)
+
+
+
+# SimUI library
+add_library(XRGyroControls 
+  simui_src/IndigoHID.swift simui_src/SimulatorSupport.swift
+)
+target_compile_options(XRGyroControls PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator -import-objc-header ${CMAKE_SOURCE_DIR}/simui_src/simui-Bridging-Header.h)
+target_link_libraries(XRGyroControls PRIVATE SimulatorKit /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator)
+set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
+
+#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${OPENGL_LIBRARIES} ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
