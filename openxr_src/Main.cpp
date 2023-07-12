@@ -18,7 +18,9 @@
 
 uint32_t swapchainImageIndex;
 int frame_started = 0;
-
+std::mutex renderMutex;
+std::mutex renderMutex2;
+std::mutex dataMutex;
 
 extern "C"
 {
@@ -137,7 +139,7 @@ extern "C" void render_loop()
   while (1)
   {
     openxr_pre_loop();
-    openxr_loop();
+    //openxr_loop();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
@@ -152,6 +154,7 @@ extern "C" int openxr_init()
   //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
 
   frame_started = 0;
+  renderMutex2.lock();
 
 #if 1
   char tmp[1024];
@@ -215,7 +218,7 @@ extern "C" int openxr_init()
 
   printf("XRHax: OpenXR init success!\n");
 
-  render_thread = new std::thread(render_loop);
+  //render_thread = new std::thread(render_loop);
 
   return EXIT_SUCCESS;
 }
@@ -290,6 +293,8 @@ extern "C" int openxr_loop()
     return 1;
   }
 
+  if (!frame_started) return 0;
+
   static int throttle_prints = 0;
   auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
   long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
@@ -299,8 +304,6 @@ extern "C" int openxr_loop()
   }
 
   last_loop = std::chrono::high_resolution_clock::now();
-
-  if (!frame_started) return 0;
 
   //else if (frameResult == Headset::BeginFrameResult::RenderFully)
   {
@@ -319,6 +322,93 @@ extern "C" int openxr_loop()
 
   //context.sync(); // Sync before destroying so that resources are free
   return 0;
+}
+
+extern "C" int openxr_full_loop()
+{
+  uint32_t local_swapchainImageIndex = 0;
+  if (!context || !context->isValid()) {
+    if(openxr_init() != EXIT_SUCCESS) {
+      openxr_is_done = 1;
+      return 1;
+    }
+  }
+
+  // Main loop
+  if (headset->isExitRequested()) {
+    openxr_is_done = 1;
+    return 1;
+  }
+
+  //renderMutex.lock();
+
+  //std::lock_guard<std::mutex> guard(renderMutex);
+
+  static int throttle_prints = 0;
+  auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
+  long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  if (++throttle_prints > 240) {
+    printf("%zu microseconds loop\n", (size_t)microseconds);
+    throttle_prints = 0;
+  }
+  last_loop = std::chrono::high_resolution_clock::now();
+
+
+  const Headset::BeginFrameResult frameResult = headset->beginFrame(local_swapchainImageIndex);
+  dataMutex.unlock();
+  if (frameResult == Headset::BeginFrameResult::Error)
+  {
+    openxr_is_done = 1;
+    return 1;
+  }
+  else if (frameResult == Headset::BeginFrameResult::RenderFully)
+  {
+    //printf("wait for frame...\n");
+    for (int i = 0; i < 32; i++)
+    {
+      if (renderMutex2.try_lock()) {
+        break;
+      }
+      //dataMutex.unlock();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    renderer->render(local_swapchainImageIndex);
+    renderer->submit(false);
+  }
+
+  if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
+  {
+    headset->endFrame();
+  }
+  //printf("XRHax: OpenXR loop done\n");
+
+  //context.sync(); // Sync before destroying so that resources are free
+  renderMutex.unlock();
+  //printf("releasing lock\n");
+
+  return 0;
+}
+
+extern "C" void openxr_spawn_renderframe()
+{
+  for (int i = 0; i < 32; i++)
+  {
+    if (renderMutex.try_lock()) {
+      //printf("spawn render...\n");
+      std::thread(openxr_full_loop).detach();
+      return;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  //printf("couldn't spawn render...\n");
+  dataMutex.unlock();
+}
+
+extern "C" void openxr_complete_renderframe()
+{
+  //printf("frame completed, unlocking\n");
+  renderMutex2.unlock();
 }
 
 extern "C" int openxr_done()
@@ -351,6 +441,8 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->tangents_l = NULL;
   out->tangents_r = NULL;
   if (!headset) return;
+
+  dataMutex.lock();
 
   //std::lock_guard<std::mutex> guard(headset->eyePoseMutex);
 

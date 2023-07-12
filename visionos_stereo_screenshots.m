@@ -178,12 +178,14 @@ void hook_RCPAnchorDefinitionComponentInitWithHand(void* a, void* b, void* c)
 DYLD_INTERPOSE(hook_RCPAnchorDefinitionComponentInitWithHand, RCPAnchorDefinitionComponentInitWithHand);
 DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
 
+#if 0
 void RERenderManagerWaitForFramePacing(void* ctx);
 void hook_RERenderManagerWaitForFramePacing(void* ctx)
 {
 
 }
 DYLD_INTERPOSE(hook_RERenderManagerWaitForFramePacing, RERenderManagerWaitForFramePacing);
+#endif
 
 static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   cp_drawable_t retval = cp_frame_query_drawable(frame);
@@ -259,6 +261,9 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   //openxr_set_textures(gHookedSimulatorPreviewTexture, gHookedRightTexture, gHookedRightTexture.width, gHookedRightTexture.height);
   //openxr_pre_loop();
 
+  openxr_spawn_renderframe();
+
+  // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
   openxr_headset_data xr_data;
   openxr_headset_get_data(&xr_data);
 
@@ -430,13 +435,21 @@ DYLD_INTERPOSE(hook_cp_frame_query_drawable, cp_frame_query_drawable);
 
 static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
-  /*if (gHookedDrawable == drawable) {
+  if (gHookedDrawable == drawable) {
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
       //DumpScreenshot();
+      //openxr_loop();
+      //openxr_spawn_renderframe();
+      openxr_complete_renderframe();
     }];
-  }*/
+  }
+
+  //openxr_complete_renderframe();
 
   //NSLog(@"visionos_stereo_screenshot: present");
+  if (gHookedDrawable == drawable) {
+    //openxr_spawn_renderframe();
+  }
 
   cp_drawable_encode_present(drawable, command_buffer);
   //openxr_loop();
@@ -520,10 +533,12 @@ cp_layer_renderer_layout cp_layer_configuration_get_layout_private(
 DYLD_INTERPOSE(hook_cp_layer_configuration_get_layout_private,
                cp_layer_configuration_get_layout_private);*/
 
+#if 0
 static void hook_sleep(unsigned int a) {
   //sleep(a);
 }
 DYLD_INTERPOSE(hook_sleep, sleep);
+#endif
 
 #if 0
 void RERenderFrameSettingsSetTotalTime(void* re, float time);
@@ -610,12 +625,14 @@ static void DumpScreenshot() {
 
 //RSXRRenderLoop::currentFrequency
 
+#if 0
 static double (*real_RSUserSettings_worstAllowedFrameTime)(void* self, double val);
 static double hook_RSUserSettings_worstAllowedFrameTime(void* self, double val) {
   double ret = real_RSUserSettings_worstAllowedFrameTime(self, val);
   //printf("worstAllowedFrameTime %f %f\n", val, ret);
   return ret;
 }
+#endif
 
 static int (*real_RSXRRenderLoop_currentFrequency)(void* self);
 static int hook_RSXRRenderLoop_currentFrequency(void* self) {
@@ -642,12 +659,14 @@ __attribute__((constructor)) static void SetupSignalHandler() {
   signal(SIGUSR1, SIG_IGN);
   dispatch_activate(signal_source);
 
+#if 0
   {
     Class cls = NSClassFromString(@"RSUserSettings");
     Method method = class_getInstanceMethod(cls, @selector(worstAllowedFrameTime));
     real_RSUserSettings_worstAllowedFrameTime = (void*)method_getImplementation(method);
     method_setImplementation(method, (IMP)hook_RSUserSettings_worstAllowedFrameTime);
   }
+#endif
 
   {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
