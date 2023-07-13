@@ -109,7 +109,7 @@ class IndigoHIDMessage {
         message.write(3, at: 0x34) // size of the next 3 bytes, setting this high causes a stack overflow in backboardd lol
         
         // [3C]
-        message.data[0x38] = 0 // ?
+        message.data[0x38] = pose.grab_val.0 > 0.75 ? 1 : 0 // ?
         message.data[0x39] = 2
         message.data[0x3A] = 0 // ?
 
@@ -119,7 +119,7 @@ class IndigoHIDMessage {
         // [3C]
         message.data[0x3F] = pose.grab_val.1 > 0.75 ? 1 : 0 // pinch right
         message.data[0x40] = 1 // UInt8(test & 0xFF)
-        message.data[0x41] = pose.grab_val.0 > 0.75 ? 1 : 0 // ?
+        message.data[0x41] = 0 // ?
 
         // u8 0x42
         message.data[0x42] = 0
@@ -182,16 +182,16 @@ class IndigoHIDMessage {
         */
 
         // Touch ray origin
-        message.write(pose.r_controller.12, at: 0x67)
-        message.write(pose.r_controller.13 - 1.5,  at: 0x6B)
-        message.write(pose.r_controller.14,  at: 0x6F)
-        message.write(pose.r_controller.15,   at: 0x73)
+        message.write(pose.l_controller.12, at: 0x67)
+        message.write(pose.l_controller.13 - 1.5,  at: 0x6B)
+        message.write(pose.l_controller.14,  at: 0x6F)
+        message.write(pose.l_controller.15,   at: 0x73)
         
         // Touch ray XYZ end offset from origin
-        message.write(-pose.r_controller.8,   at: 0x77)
-        message.write(-pose.r_controller.9,   at: 0x7B)
-        message.write(-pose.r_controller.10,   at: 0x7F)
-        message.write(pose.r_controller.11,   at: 0x83)
+        message.write(-pose.l_controller.8,   at: 0x77)
+        message.write(-pose.l_controller.9,   at: 0x7B)
+        message.write(-pose.l_controller.10,   at: 0x7F)
+        message.write(pose.l_controller.11,   at: 0x83)
         
         // Pinch ray origin
         message.write(pose.r_controller.12, at: 0x87)
