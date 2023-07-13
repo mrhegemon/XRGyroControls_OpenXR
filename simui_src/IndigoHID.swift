@@ -143,102 +143,67 @@ class IndigoHIDMessage {
         */
 
         // (I assume) gaze origin
-        // doesn't actually matter, overridden
         message.write(pose.r_controller.12, at: 0x47)
         message.write(pose.r_controller.13 - 1.5, at: 0x4B)
         message.write(pose.r_controller.14, at: 0x4F)
         message.write(0.0,      at: 0x53)
 
         // XYZ ray offset from gaze origin
-        // doesn't actually matter, overridden
         message.write(-pose.r_controller.8, at: 0x57) // yaw
         message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
         message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
-        message.write(1.0, at: 0x63)
+        message.write(0.0, at: 0x63)
         
-        // Pose matrix? Maybe related to the pan/yaw/roll thing because it's printing out the same thing as the pre-converted simd matrix
-        // If it is that I have no idea why tf it is duplicated... idk
-        
-        // This seems to be used for the actual hover interactions
         // Left eye
-        /*message.write(pose.l_view.0, at: 0x67)
-        message.write(pose.l_view.1,  at: 0x6B)
-        message.write(pose.l_view.2,  at: 0x6F)
-        message.write(pose.l_view.3,   at: 0x73)
+        /*
+        // Touch ray origin
+        message.write(pose.l_view.12, at: 0x67)
+        message.write(pose.l_view.13 - 1.5,  at: 0x6B)
+        message.write(pose.l_view.14,  at: 0x6F)
+        message.write(pose.l_view.15,   at: 0x73)
         
-        message.write(pose.l_view.4,   at: 0x77)
-        message.write(pose.l_view.5,   at: 0x7B)
-        message.write(pose.l_view.6,   at: 0x7F)
-        message.write(pose.l_view.7,   at: 0x83)
+        // Touch ray XYZ end offset from origin
+        message.write(-pose.l_view.8,   at: 0x77)
+        message.write(-pose.l_view.9,   at: 0x7B)
+        message.write(-pose.l_view.10,   at: 0x7F)
+        message.write(pose.l_view.11,   at: 0x83)
         
-        message.write(pose.l_view.8, at: 0x87)
-        message.write(pose.l_view.9,  at: 0x8B)
-        message.write(pose.l_view.10,  at: 0x8F)
-        message.write(pose.l_view.11,   at: 0x93)
+        // Pinch ray origin
+        message.write(pose.l_view.12, at: 0x87)
+        message.write(pose.l_view.13 - 1.5,  at: 0x8B)
+        message.write(pose.l_view.14,  at: 0x8F)
+        message.write(pose.l_view.15,   at: 0x93)
         
-        message.write(pose.l_view.12,   at: 0x97)
-        message.write(pose.l_view.13 - 1.5,   at: 0x9B)
-        message.write(pose.l_view.14,   at: 0x9F)
-        message.write(pose.l_view.15,   at: 0xA3)*/
+        // Pinch ray XYZ end offset from origin
+        message.write(-pose.l_view.8,   at: 0x97)
+        message.write(-pose.l_view.9,   at: 0x9B)
+        message.write(-pose.l_view.10,   at: 0x9F)
+        message.write(pose.l_view.11,   at: 0xA3)
+        */
 
-        message.write(pose.r_controller.0, at: 0x67)
-        message.write(pose.r_controller.1,  at: 0x6B)
-        message.write(pose.r_controller.2,  at: 0x6F)
-        message.write(pose.r_controller.3,   at: 0x73)
+        // Touch ray origin
+        message.write(pose.r_controller.12, at: 0x67)
+        message.write(pose.r_controller.13 - 1.5,  at: 0x6B)
+        message.write(pose.r_controller.14,  at: 0x6F)
+        message.write(pose.r_controller.15,   at: 0x73)
         
-        message.write(pose.r_controller.4,   at: 0x77)
-        message.write(pose.r_controller.5,   at: 0x7B)
-        message.write(pose.r_controller.6,   at: 0x7F)
-        message.write(pose.r_controller.7,   at: 0x83)
+        // Touch ray XYZ end offset from origin
+        message.write(-pose.r_controller.8,   at: 0x77)
+        message.write(-pose.r_controller.9,   at: 0x7B)
+        message.write(-pose.r_controller.10,   at: 0x7F)
+        message.write(pose.r_controller.11,   at: 0x83)
         
-        message.write(pose.r_controller.8, at: 0x87)
-        message.write(pose.r_controller.9,  at: 0x8B)
-        message.write(pose.r_controller.10,  at: 0x8F)
-        message.write(pose.r_controller.11,   at: 0x93)
+        // Pinch ray origin
+        message.write(pose.r_controller.12, at: 0x87)
+        message.write(pose.r_controller.13 - 1.5,  at: 0x8B)
+        message.write(pose.r_controller.14,  at: 0x8F)
+        message.write(pose.r_controller.15,   at: 0x93)
         
-        message.write(pose.r_controller.12,   at: 0x97)
-        message.write(pose.r_controller.13 - 1.5,   at: 0x9B)
-        message.write(pose.r_controller.14,   at: 0x9F)
-        message.write(pose.r_controller.15,   at: 0xA3)
-
-        /*message.write(1.0, at: 0x67)
-        message.write(0.0,  at: 0x6B)
-        message.write(0.0,  at: 0x6F)
-        message.write(0.0,   at: 0x73)
-        
-        message.write(0.0,   at: 0x77)
-        message.write(1.0,   at: 0x7B)
-        message.write(0.0,   at: 0x7F)
-        message.write(0.0,   at: 0x83)
-
-        message.write(0.0, at: 0x87)
-        message.write(0.0,  at: 0x8B)
-        message.write(1.0,   at: 0x8F)
-        message.write(0.0,    at: 0x93)
-
-        message.write(0.0,    at: 0x97)
-        message.write(0.0,    at: 0x9B)
-        message.write(0.0,    at: 0x9F)
-        message.write(1.0,    at: 0xA3)*/
-        
-
-        /*message.write(x, at: 0x67)
-        message.write(y, at: 0x6B)
-        message.write(z, at: 0x6F)
-
-        message.write(qx, at: 0x73)
-        message.write(qy, at: 0x77)
-        message.write(qz, at: 0x7B)
-        message.write(qw, at: 0x7F)
-
-        message.write(x, at: 0x83)
-        message.write(y, at: 0x87)
-        message.write(z, at: 0x8B)
-
-        message.write(qx, at: 0x8F)
-        message.write(qy, at: 0x93)
-        message.write(qz, at: 0x97)
-        message.write(qw, at: 0x9B)*/
+        // Pinch ray XYZ end offset from origin
+        message.write(-pose.r_controller.8,   at: 0x97)
+        message.write(-pose.r_controller.9,   at: 0x9B)
+        message.write(-pose.r_controller.10,   at: 0x9F)
+        message.write(pose.r_controller.11,   at: 0xA3)
         
         return message
     }
