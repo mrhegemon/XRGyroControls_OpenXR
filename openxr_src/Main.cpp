@@ -534,7 +534,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
     memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
 
-    glm::vec3 z_vec = glm::vec3(dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10], dat->gaze_mat[11]);
+    glm::vec3 z_vec = glm::vec3(dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10]);
 
     //printf("Left:  %f %f %f %f\n", dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10], dat->gaze_mat[11]);
   }
