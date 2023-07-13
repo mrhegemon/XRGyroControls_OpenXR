@@ -46,7 +46,10 @@ public:
 
   XrActionStateFloat grab_value[HAND_COUNT];
   XrSpaceLocation tracked_locations[64];
+  XrActionSet gameplay_actionset;
 
+  bool pinch_l;
+  bool pinch_r;
 
   XrPath grip_pose_path[HAND_COUNT];
   XrPath haptic_path[HAND_COUNT];

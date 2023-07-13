@@ -1,4 +1,5 @@
 #include "../openxr-Bridging-Header.h"
+#include "../simui_src/simui_types.h"
 #include "Context.h"
 #include "Headset.h"
 #include "Renderer.h"
@@ -15,6 +16,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <chrono>
 #include <thread>
+#include "Util.h"
 
 uint32_t swapchainImageIndex;
 int frame_started = 0;
@@ -116,6 +118,7 @@ Headset* headset = nullptr;
 Renderer* renderer = nullptr;
 int openxr_is_done = 0;
 std::thread* render_thread;
+void* shm_addr;
 
  std::chrono::time_point<std::chrono::high_resolution_clock> last_loop;
 
@@ -156,7 +159,6 @@ extern "C" int openxr_init()
   frame_started = 0;
   renderMutex2.lock();
 
-#if 1
   char tmp[1024];
   snprintf(tmp, sizeof(tmp), "%s/IOUSBLib_ios_hax.dylib", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
   const char* pszModule = tmp;
@@ -165,26 +167,23 @@ extern "C" int openxr_init()
   {
       printf("Failed to dlopen %s.  %s\n", pszModule, dlerror() );
   }
-  void* test_dyld = dlsym(h, "IOUSBLibFactory");
-  printf("Found symbol? %p\n", test_dyld);
 
-  //libusb_test_main();
-
-  /*int count = _dyld_image_count();
-  for (int i = 0; i < count; i++)
   {
-    printf("%s\n", _dyld_get_image_name(i));
-  }*/
-  //printf("%p\n", getDyldBase());
-  //printf("%08x\n", *(uint32_t*)getDyldBase());
-  //printf("%08x\n", *(uint32_t*)((intptr_t)getDyldBase() + 0x0003d94c));
+    // Open the shared memory, with required access mode and permissions.
+    // This is analagous to how we open file with open()
+    int fd = shm_open("/tmp/Sim2OpenXR_shmem", O_CREAT | O_RDWR /* open flags */, S_IRUSR | S_IWUSR /* mode */);
 
-  //void* (*test_dlsym)(void*, const char*) = ( void* (*)(void*, const char*))((intptr_t)getDyldBase() + 0x0003d94c);
+    // extend or shrink to the required size (specified in bytes)
+    ftruncate(fd, 1048576); // picking 1MB size as an example
+
+    // map the shared memory to an address in the virtual address space
+    // with the file descriptor of the shared memory and necessary protection.
+    // The flags to mmap must be set to MAP_SHARED for other process to access.
+    shm_addr = mmap(NULL, 1048576, PROT_READ | PROT_WRITE /*protection*/, MAP_SHARED /*flags*/, fd, 0);
   
+    printf("SimUI sharedmem startup: %u %p %x\n", fd, shm_addr, *(uint32_t*)shm_addr);
+  }
 
-  //test_dyld = test_dlsym(RTLD_DEFAULT, "dlopen");
-  //printf("Found symbol? %p %p\n", test_dyld, dlopen);
-#endif
   printf("XRHax: OpenXR init!\n");
   context = new Context();
   if (!context || !context->isValid())
@@ -444,6 +443,9 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
   dataMutex.lock();
 
+  glm::mat4 ctrl_l = util::poseToMatrix(headset->tracked_locations[0].pose);
+  glm::mat4 ctrl_r = util::poseToMatrix(headset->tracked_locations[1].pose);
+
   //std::lock_guard<std::mutex> guard(headset->eyePoseMutex);
 
   const XrView& eyePose0 = headset->eyePoses.at(0);
@@ -471,4 +473,66 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->proj_r = glm::value_ptr(headset->eyeProjectionMatrices.at(1));
   out->tangents_l = headset->eyeTangents_l;
   out->tangents_r = headset->eyeTangents_r;
+
+  if (shm_addr) {
+    sharedmem_data* dat = (sharedmem_data*)shm_addr;
+    dat->l_x  = out->l_x;
+    dat->l_y  = out->l_y;
+    dat->l_z  = out->l_z;
+    dat->l_qx = out->l_qx;
+    dat->l_qy = out->l_qy;
+    dat->l_qz = out->l_qz;
+    dat->l_qw = out->l_qw;
+
+    dat->r_x  = out->r_x;
+    dat->r_y  = out->r_y;
+    dat->r_z  = out->r_z;
+    dat->r_qx = out->r_qx;
+    dat->r_qy = out->r_qy;
+    dat->r_qz = out->r_qz;
+    dat->r_qw = out->r_qw;
+
+    glm::quat l_q(dat->l_qx, dat->l_qy, dat->l_qz, dat->l_qw);
+    glm::vec3 l_euler = glm::eulerAngles(l_q);// * 3.14159f / 180.f;
+
+    /*if ( l_euler.x > 3.14159f/2.0 )
+        l_euler.x = (3.14159f - l_euler.x);
+    if ( l_euler.y > 3.14159f/2.0 )
+        l_euler.y = (l_euler.y - 3.14159f);
+    if ( l_euler.z > 3.14159f/2.0 )
+        l_euler.z = (3.14159f - l_euler.z);*/
+
+    dat->l_ep = l_euler.z;
+    dat->l_ey = l_euler.y;
+    dat->l_er = l_euler.x;
+
+    glm::quat r_q(dat->r_qx, dat->r_qy, dat->r_qz, dat->r_qw);
+    glm::vec3 r_euler = glm::eulerAngles(r_q);// * 3.14159f / 180.f; 
+
+    /*if ( r_euler.x > 3.14159f/2.0 )
+        r_euler.x = (3.14159f - r_euler.x);
+    if ( r_euler.y > 3.14159f/2.0 )
+        r_euler.y = (3.14159f - r_euler.y);
+    if ( r_euler.z > 3.14159f/2.0 )
+        r_euler.z = (3.14159f - r_euler.z);*/
+
+    dat->r_ep = r_euler.z;
+    dat->r_ey = r_euler.y;
+    dat->r_er = r_euler.x;
+
+    memcpy(dat->l_view, out->view_l, sizeof(dat->l_view));
+    memcpy(dat->r_view, out->view_r, sizeof(dat->r_view));
+
+    //dat->grab_val[0] = headset->pinch_l ? 0.9 : 0.0;//headset->grab_value[0].currentState;
+    //dat->grab_val[1] = headset->pinch_r ? 0.9 : 0.0;//headset->grab_value[1].currentState;
+    dat->grab_val[0] = headset->grab_value[0].currentState;
+    dat->grab_val[1] = headset->grab_value[1].currentState;
+
+    memcpy(dat->l_controller, glm::value_ptr(ctrl_l), sizeof(dat->l_controller));
+    memcpy(dat->r_controller, glm::value_ptr(ctrl_r), sizeof(dat->r_controller));
+    //printf("grabs %f %f\n", dat->grab_val[0], dat->grab_val[1]);
+  }
+
+  memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
+  memcpy(out->r_controller, glm::value_ptr(ctrl_r), sizeof(out->r_controller));
 }

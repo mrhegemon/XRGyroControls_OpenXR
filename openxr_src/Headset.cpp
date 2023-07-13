@@ -414,7 +414,6 @@ Headset::Headset(const Context* context) : context(context)
   strcpy(gameplay_actionset_info.actionSetName, "gameplay_actionset");
   strcpy(gameplay_actionset_info.localizedActionSetName, "Gameplay Actions");
 
-  XrActionSet gameplay_actionset;
   result = xrCreateActionSet(xrInstance, &gameplay_actionset_info, &gameplay_actionset);
   if (XR_SUCCEEDED(result))
 
@@ -759,6 +758,17 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   // query each value / location with a subaction path != XR_NULL_PATH
   // resulting in individual values per hand/.
 
+  const XrActiveActionSet active_actionsets[] = {
+    {.actionSet = gameplay_actionset, .subactionPath = XR_NULL_PATH}};
+
+  XrActionsSyncInfo actions_sync_info = {
+    .type = XR_TYPE_ACTIONS_SYNC_INFO,
+    .countActiveActionSets = sizeof(active_actionsets) / sizeof(active_actionsets[0]),
+    .activeActionSets = active_actionsets,
+  };
+  result = xrSyncActions(session, &actions_sync_info);
+  //xr_result(self->instance, result, "failed to sync actions!");
+
   for (int i = 0; i < HAND_COUNT; i++) {
     XrActionStatePose hand_pose_state = {.type = XR_TYPE_ACTION_STATE_POSE, .next = NULL};
     {
@@ -850,17 +860,38 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
         tracked_locations[2+i].pose = leftJointLocations[i].pose;
       }
       
+      glm::vec3 v1 = {indexTipInWorld.position.x, indexTipInWorld.position.y, indexTipInWorld.position.z};
+      glm::vec3 v2 = {thumbTipInWorld.position.x, thumbTipInWorld.position.y, thumbTipInWorld.position.z};
+
+      float distance = glm::length(v2 - v1);
+
+      pinch_l = distance < 0.01;
+
+      //printf("l: %f\n", distance);
 
       //printf("l: %f %f %f\n", palmInWorld.position.x, palmInWorld.position.y, palmInWorld.position.z);
   }
 
   if (rightLocations.isActive) {
+      const XrPosef &indexTipInWorld =
+          rightJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].pose;
+      const XrPosef &thumbTipInWorld =
+          rightJointLocations[XR_HAND_JOINT_THUMB_TIP_EXT].pose;
         const XrPosef &palmInWorld =
           rightJointLocations[XR_HAND_JOINT_WRIST_EXT].pose;
 
       for (int i = 0; i <= XR_HAND_JOINT_LITTLE_TIP_EXT; i++) {
         tracked_locations[2+XR_HAND_JOINT_LITTLE_TIP_EXT+1+i].pose = rightJointLocations[i].pose;
       }
+
+      glm::vec3 v1 = {indexTipInWorld.position.x, indexTipInWorld.position.y, indexTipInWorld.position.z};
+      glm::vec3 v2 = {thumbTipInWorld.position.x, thumbTipInWorld.position.y, thumbTipInWorld.position.z};
+
+      float distance = glm::length(v2 - v1);
+
+      pinch_r = distance < 0.01;
+
+      //printf("r: %f\n", distance);
 
       //printf("r: %f %f %f\n", palmInWorld.position.x, palmInWorld.position.y, palmInWorld.position.z);
   }

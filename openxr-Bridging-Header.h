@@ -31,7 +31,12 @@ typedef struct openxr_headset_data
   float* proj_r;
   float* tangents_l;
   float* tangents_r;
+
+  float l_controller[16];
+  float r_controller[16];
 } openxr_headset_data;
+
+//#define EYE_CURSOR
 
 #ifdef __OBJC__
 @protocol MTLTexture;

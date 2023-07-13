@@ -96,7 +96,7 @@ class IndigoHIDMessage {
     // 301 - raycast?
     // 302 - raycast?
 
-    public static func manipulator(_ test: Int, _ x: Float, _ y: Float, _ z: Float, _ qx: Float, _ qy: Float, _ qz: Float, _ qw: Float) -> IndigoHIDMessage {
+    public static func manipulator(_ test: Int, _ pose: sharedmem_data) -> IndigoHIDMessage {
         // HIDMessage - sending .manipulator with pinching (L=false, R=false), touching (L=false, R=false), matrix: simd_float4x4([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]), gaze=RERay(origin: SIMD3<Float>(0.0, 0.0, 0.0), direction: SIMD3<Float>(-0.03173566, -0.04234394, -0.99859893), length: 10.0)
         
         let message = IndigoHIDMessage()
@@ -117,49 +117,109 @@ class IndigoHIDMessage {
         message.write(3, at: 0x3B) // size of the next 3 bytes, setting this high causes a stack overflow in backboardd lol
         
         // [3C]
-        message.data[0x3F] = 0 // pinch right
+        message.data[0x3F] = pose.grab_val.1 > 0.75 ? 1 : 0 // pinch right
         message.data[0x40] = 1 // UInt8(test & 0xFF)
-        message.data[0x41] = 0 // ?
+        message.data[0x41] = pose.grab_val.0 > 0.75 ? 1 : 0 // ?
 
         // u8 0x42
         message.data[0x42] = 0
         message.write(Int16(0), at: 0x43)
         message.write(Int16(0), at: 0x45)
         
+        /*
         // (I assume) gaze origin
-        message.write(x, at: 0x47)
-        message.write(y, at: 0x4B)
-        message.write(z, at: 0x4F)
-        
-        // gaze direction
-        message.write(qx, at: 0x57)
-        message.write(qy, at: 0x5B)
-        message.write(qz, at: 0x5F)
-        message.write(qw, at: 0x63)
+        // doesn't actually matter, overridden
+        message.write(pose.l_x, at: 0x47)
+        message.write(pose.l_y - 1.5, at: 0x4B)
+        message.write(pose.l_z, at: 0x4F)
+        message.write(0.0,      at: 0x53)
+
+        // XYZ ray offset from gaze origin
+        // doesn't actually matter, overridden
+        message.write(-pose.l_view.8, at: 0x57) // yaw
+        message.write(-pose.l_view.9, at: 0x5B) // pitch pose.l_ep
+        message.write(-pose.l_view.10, at: 0x5F) // roll pose.l_er
+        message.write(1.0, at: 0x63)
+        */
+
+        // (I assume) gaze origin
+        // doesn't actually matter, overridden
+        message.write(pose.r_controller.12, at: 0x47)
+        message.write(pose.r_controller.13 - 1.5, at: 0x4B)
+        message.write(pose.r_controller.14, at: 0x4F)
+        message.write(0.0,      at: 0x53)
+
+        // XYZ ray offset from gaze origin
+        // doesn't actually matter, overridden
+        message.write(-pose.r_controller.8, at: 0x57) // yaw
+        message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
+        message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
+        message.write(1.0, at: 0x63)
         
         // Pose matrix? Maybe related to the pan/yaw/roll thing because it's printing out the same thing as the pre-converted simd matrix
         // If it is that I have no idea why tf it is duplicated... idk
         
+        // This seems to be used for the actual hover interactions
+        // Left eye
+        /*message.write(pose.l_view.0, at: 0x67)
+        message.write(pose.l_view.1,  at: 0x6B)
+        message.write(pose.l_view.2,  at: 0x6F)
+        message.write(pose.l_view.3,   at: 0x73)
         
-        message.write(0.0, at: 0x67)
+        message.write(pose.l_view.4,   at: 0x77)
+        message.write(pose.l_view.5,   at: 0x7B)
+        message.write(pose.l_view.6,   at: 0x7F)
+        message.write(pose.l_view.7,   at: 0x83)
+        
+        message.write(pose.l_view.8, at: 0x87)
+        message.write(pose.l_view.9,  at: 0x8B)
+        message.write(pose.l_view.10,  at: 0x8F)
+        message.write(pose.l_view.11,   at: 0x93)
+        
+        message.write(pose.l_view.12,   at: 0x97)
+        message.write(pose.l_view.13 - 1.5,   at: 0x9B)
+        message.write(pose.l_view.14,   at: 0x9F)
+        message.write(pose.l_view.15,   at: 0xA3)*/
+
+        message.write(pose.r_controller.0, at: 0x67)
+        message.write(pose.r_controller.1,  at: 0x6B)
+        message.write(pose.r_controller.2,  at: 0x6F)
+        message.write(pose.r_controller.3,   at: 0x73)
+        
+        message.write(pose.r_controller.4,   at: 0x77)
+        message.write(pose.r_controller.5,   at: 0x7B)
+        message.write(pose.r_controller.6,   at: 0x7F)
+        message.write(pose.r_controller.7,   at: 0x83)
+        
+        message.write(pose.r_controller.8, at: 0x87)
+        message.write(pose.r_controller.9,  at: 0x8B)
+        message.write(pose.r_controller.10,  at: 0x8F)
+        message.write(pose.r_controller.11,   at: 0x93)
+        
+        message.write(pose.r_controller.12,   at: 0x97)
+        message.write(pose.r_controller.13 - 1.5,   at: 0x9B)
+        message.write(pose.r_controller.14,   at: 0x9F)
+        message.write(pose.r_controller.15,   at: 0xA3)
+
+        /*message.write(1.0, at: 0x67)
         message.write(0.0,  at: 0x6B)
         message.write(0.0,  at: 0x6F)
         message.write(0.0,   at: 0x73)
         
         message.write(0.0,   at: 0x77)
-        message.write(0.0,   at: 0x7B)
+        message.write(1.0,   at: 0x7B)
         message.write(0.0,   at: 0x7F)
-        message.write(1.0,   at: 0x83)
-        
+        message.write(0.0,   at: 0x83)
+
         message.write(0.0, at: 0x87)
         message.write(0.0,  at: 0x8B)
-        message.write(0.0,  at: 0x8F)
-        message.write(0.0,   at: 0x93)
-        
-        message.write(0.0,   at: 0x97)
-        message.write(0.0,   at: 0x9B)
-        message.write(0.0,   at: 0x9F)
-        message.write(1.0,   at: 0xA3)
+        message.write(1.0,   at: 0x8F)
+        message.write(0.0,    at: 0x93)
+
+        message.write(0.0,    at: 0x97)
+        message.write(0.0,    at: 0x9B)
+        message.write(0.0,    at: 0x9F)
+        message.write(1.0,    at: 0xA3)*/
         
 
         /*message.write(x, at: 0x67)

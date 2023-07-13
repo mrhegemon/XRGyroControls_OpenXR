@@ -35,8 +35,12 @@ static simd_float4x4 gWorldMat = {.columns = {
                                             {0, 2.0, 0, 1},
                                         }};
 
+static simd_float4x4 left_controller_pose;
+static simd_float4x4 right_controller_pose;
+
 static simd_float4 left_eye_pos;
 static simd_float4 left_eye_quat;
+static simd_float4 left_eye_zbasis;
 static simd_float4 right_eye_pos;
 static simd_float4 right_eye_quat;
 
@@ -288,7 +292,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   // Y is +up/-down
   // Z is -forward/+back
   left_eye_pos[0] = xr_data.l_x;
-  left_eye_pos[1] = xr_data.l_y;
+  left_eye_pos[1] = xr_data.l_y - 1.5;
   left_eye_pos[2] = xr_data.l_z;
   left_eye_pos[3] = 0.0;
 
@@ -298,7 +302,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   left_eye_quat[3] = xr_data.l_qw;
 
   right_eye_pos[0] = xr_data.r_x;
-  right_eye_pos[1] = xr_data.r_y;
+  right_eye_pos[1] = xr_data.r_y - 1.5;
   right_eye_pos[2] = xr_data.r_z;
   right_eye_pos[3] = 0.0;
 
@@ -346,6 +350,15 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     }
   }
 
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 4; j++)
+    {
+      left_controller_pose.columns[i][j] = xr_data.l_controller[(i*4)+j];
+      right_controller_pose.columns[i][j] = xr_data.r_controller[(i*4)+j];
+    }
+  }
+
   simView->height_maybe = 0.0f;
 #ifdef SEPARATE_LEFT_EYE_VIEW
   leftView->height_maybe = 0.0f;
@@ -361,9 +374,22 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   //rightView->transform.columns[3][1] += 2.0;
 
 
+  /*gWorldMat.columns[3][0] = view_mat_l.columns[3][0];
+  gWorldMat.columns[3][1] = view_mat_l.columns[3][1] - 1.5;
+  gWorldMat.columns[3][2] = view_mat_l.columns[3][2];*/
+  
+  /*view_mat_r.columns[3][0] -= view_mat_l.columns[3][0];
+  view_mat_r.columns[3][1] -= view_mat_l.columns[3][1];
+  view_mat_r.columns[3][2] -= view_mat_l.columns[3][2];
+  view_mat_l.columns[3][0] = 0.0;
+  view_mat_l.columns[3][1] = 0.0;
+  view_mat_l.columns[3][2] = 0.0;*/
+
   // idk
   view_mat_l.columns[3][1] -= 1.5f;
   view_mat_r.columns[3][1] -= 1.5f;
+  left_controller_pose.columns[3][1] -= 1.5f;
+  right_controller_pose.columns[3][1] -= 1.5f;
   
   for (int i = 0; i < 0x20; i += 4)
   {
@@ -453,6 +479,11 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   //leftView->transform = gIdentityMat;
   //rightView->transform = gRightEyeMatrix;
 
+  left_eye_zbasis[0] = view_mat_l.columns[2][0];
+  left_eye_zbasis[1] = view_mat_l.columns[2][1];
+  left_eye_zbasis[2] = view_mat_l.columns[2][2];
+  left_eye_zbasis[3] = view_mat_l.columns[2][3];
+
   return retval;
 }
 
@@ -487,16 +518,29 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
 
 DYLD_INTERPOSE(hook_cp_drawable_encode_present, cp_drawable_encode_present);
 
+#if 1
 int RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose);
 int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose) {
   int ret = RCPHIDEventGetSelectionRay(ctx, pose);
-  //pose->position = left_eye_pos;
-  //pose->rotation = left_eye_quat;
 
-  printf("selection ray %u, %f %f %f %f\n", ret, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);
+  pose->position = right_controller_pose.columns[3];
+  pose->rotation[0] = -right_controller_pose.columns[2][0];
+  pose->rotation[1] = -right_controller_pose.columns[2][1];
+  pose->rotation[2] = -right_controller_pose.columns[2][2];
+
+#ifdef EYE_CURSOR
+  pose->position = left_eye_pos;
+  //pose->rotation = left_eye_quat;
+  pose->rotation[0] = -left_eye_zbasis[0];
+  pose->rotation[1] = -left_eye_zbasis[1];
+  pose->rotation[2] = -left_eye_zbasis[2];
+#endif
+
+  //printf("selection ray %u, %f %f %f %f, %f %f %f %f\n", ret, pose->position[0], pose->position[1], pose->position[2], pose->position[3], pose->rotation[0], pose->rotation[1], pose->rotation[2], pose->rotation[3]);
   return ret;
 }
 DYLD_INTERPOSE(hook_RCPHIDEventGetSelectionRay, RCPHIDEventGetSelectionRay);
+#endif
 
 void cp_drawable_present(cp_drawable_t drawable);
 static void hook_cp_drawable_present(cp_drawable_t drawable) {
@@ -708,16 +752,16 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose->position = left_eye_pos;
     pose->rotation = left_eye_quat;
-  }
+  }*/
   
-  printf("get eye pos %u, %f %f %f %f\n", forEye, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);*/
+  //printf("get eye pos %u, %f %f %f %f\n", forEye, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);
 }
 
 static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL sel,
                                                   struct RSSimulatedHeadsetPose pose, int forEye);
 static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose, int forEye) {
-  if (forEye == 0)
+  /*if (forEye == 0)
   {
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
@@ -731,7 +775,7 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
-  }
+  }*/
 
   real_RSSimulatedHeadset_setEyePose(self, sel, pose, forEye);
   

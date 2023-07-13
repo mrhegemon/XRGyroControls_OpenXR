@@ -25,24 +25,29 @@ import os
     @objc func openxr_thread() {
         Thread.sleep(forTimeInterval: 1.0)
 
-        print("OpenXR thread start!")
+        //print("OpenXR thread start!")
+
+        ObjCBridge_Startup();
+
         var asdf: Int = 0
         while (true) {
-            
+            let pose = ObjCBridge_Loop().pointee;
             //let pose = self.openxr_wrapper.get_data()
             
-            //hid_client.send(message: IndigoHIDMessage.pose(pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw).as_struct())
-            //hid_client.send(message: IndigoHIDMessage.manipulator(asdf, pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw).as_struct())
+            hid_client.send(message: IndigoHIDMessage.pose(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0).as_struct())
+            hid_client.send(message: IndigoHIDMessage.manipulator(asdf, pose).as_struct())
 
             asdf += 1
-            if (asdf > 255) {
+            if (asdf > 120) {
                 asdf = 0
             }
 
-            Thread.sleep(forTimeInterval: 0.032)
+            Thread.sleep(forTimeInterval: 0.008)
             //Thread.sleep(forTimeInterval: 0.5)
         }
-        print("OpenXR thread end!")
+
+        ObjCBridge_Shutdown();
+        //print("OpenXR thread end!")
         //self.openxr_wrapper.cleanup()
     }
     
