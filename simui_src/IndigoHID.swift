@@ -143,7 +143,22 @@ class IndigoHIDMessage {
         */
 
         // (I assume) gaze origin
-        message.write(pose.r_controller.12, at: 0x47)
+        // doesn't actually matter, overridden
+        message.write(pose.l_x, at: 0x47)
+        message.write(pose.l_y - 1.5, at: 0x4B)
+        message.write(pose.l_z, at: 0x4F)
+        message.write(0.0,      at: 0x53)
+
+        // XYZ ray offset from gaze origin
+        // doesn't actually matter, overridden
+        message.write(-pose.gaze_mat.8, at: 0x57) // yaw
+        message.write(-pose.gaze_mat.9, at: 0x5B) // pitch pose.l_ep
+        message.write(-pose.gaze_mat.10, at: 0x5F) // roll pose.l_er
+        message.write(0.0, at: 0x63)
+        
+
+        // (I assume) gaze origin
+        /*message.write(pose.r_controller.12, at: 0x47)
         message.write(pose.r_controller.13 - 1.5, at: 0x4B)
         message.write(pose.r_controller.14, at: 0x4F)
         message.write(0.0,      at: 0x53)
@@ -152,7 +167,7 @@ class IndigoHIDMessage {
         message.write(-pose.r_controller.8, at: 0x57) // yaw
         message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
         message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
-        message.write(0.0, at: 0x63)
+        message.write(0.0, at: 0x63)*/
         
         // Left eye
         /*

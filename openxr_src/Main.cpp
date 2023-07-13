@@ -531,6 +531,12 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     memcpy(dat->l_controller, glm::value_ptr(ctrl_l), sizeof(dat->l_controller));
     memcpy(dat->r_controller, glm::value_ptr(ctrl_r), sizeof(dat->r_controller));
     //printf("grabs %f %f\n", dat->grab_val[0], dat->grab_val[1]);
+
+    memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
+
+    glm::vec3 z_vec = glm::vec3(dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10], dat->gaze_mat[11]);
+
+    //printf("Left:  %f %f %f %f\n", dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10], dat->gaze_mat[11]);
   }
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));

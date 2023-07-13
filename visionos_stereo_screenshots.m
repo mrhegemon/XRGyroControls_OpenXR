@@ -523,17 +523,19 @@ int RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose);
 int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose) {
   int ret = RCPHIDEventGetSelectionRay(ctx, pose);
 
+#if 0
   pose->position = right_controller_pose.columns[3];
   pose->rotation[0] = -right_controller_pose.columns[2][0];
   pose->rotation[1] = -right_controller_pose.columns[2][1];
   pose->rotation[2] = -right_controller_pose.columns[2][2];
 
-#ifdef EYE_CURSOR
+//#ifdef EYE_CURSOR
   pose->position = left_eye_pos;
   //pose->rotation = left_eye_quat;
   pose->rotation[0] = -left_eye_zbasis[0];
   pose->rotation[1] = -left_eye_zbasis[1];
   pose->rotation[2] = -left_eye_zbasis[2];
+//#endif
 #endif
 
   //printf("selection ray %u, %f %f %f %f, %f %f %f %f\n", ret, pose->position[0], pose->position[1], pose->position[2], pose->position[3], pose->rotation[0], pose->rotation[1], pose->rotation[2], pose->rotation[3]);

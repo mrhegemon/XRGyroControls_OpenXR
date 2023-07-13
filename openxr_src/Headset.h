@@ -51,6 +51,9 @@ public:
   bool pinch_l;
   bool pinch_r;
 
+  glm::mat4 l_eye_mat;
+  glm::mat4 r_eye_mat;
+
   XrPath grip_pose_path[HAND_COUNT];
   XrPath haptic_path[HAND_COUNT];
   XrPath thumbstick_y_path[HAND_COUNT];

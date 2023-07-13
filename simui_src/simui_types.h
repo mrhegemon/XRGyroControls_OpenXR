@@ -38,6 +38,7 @@ typedef struct sharedmem_data
 
   float l_controller[16];
   float r_controller[16];
+  float gaze_mat[16];
 } sharedmem_data;
 
 #ifdef __cplusplus

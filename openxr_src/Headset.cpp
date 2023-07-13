@@ -6,6 +6,8 @@
 
 #include <array>
 #include <sstream>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 namespace
 {
@@ -16,6 +18,12 @@ constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
                                 .position = {.x = 0, .y = 0, .z = 0}};
+
+extern "C" 
+{
+  extern float ql_xrsp_sidechannel_eye_l_orient[4];
+  extern float ql_xrsp_sidechannel_eye_r_orient[4];
+}
 
 Headset::Headset(){}
 
@@ -895,6 +903,19 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
       //printf("r: %f %f %f\n", palmInWorld.position.x, palmInWorld.position.y, palmInWorld.position.z);
   }
+
+  //printf("Left 1? %f %f %f %f\n", ql_xrsp_sidechannel_eye_l_orient[0], ql_xrsp_sidechannel_eye_l_orient[1], ql_xrsp_sidechannel_eye_l_orient[2], ql_xrsp_sidechannel_eye_l_orient[3]);
+  glm::quat l_q(ql_xrsp_sidechannel_eye_l_orient[3], ql_xrsp_sidechannel_eye_l_orient[0], ql_xrsp_sidechannel_eye_l_orient[1], ql_xrsp_sidechannel_eye_l_orient[2]);
+  l_eye_mat = glm::toMat4(l_q);
+  glm::mat4 l_view_no_rot = eyeViewMatrices.at(0);
+  l_view_no_rot[3] = glm::vec4(0, 0, 0, 1);
+  l_eye_mat = l_view_no_rot * l_eye_mat;
+
+  glm::quat r_q(ql_xrsp_sidechannel_eye_r_orient[3], ql_xrsp_sidechannel_eye_r_orient[0], ql_xrsp_sidechannel_eye_r_orient[1], ql_xrsp_sidechannel_eye_r_orient[2]);
+  r_eye_mat = glm::toMat4(r_q);
+  glm::mat4 r_view_no_rot = eyeViewMatrices.at(1);
+  r_view_no_rot[3] = glm::vec4(0, 0, 0, 1);
+  r_eye_mat = r_view_no_rot * r_eye_mat;
 
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
 }
