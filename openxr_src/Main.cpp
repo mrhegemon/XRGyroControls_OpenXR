@@ -16,6 +16,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <chrono>
 #include <thread>
+#include <deque>
 #include "Util.h"
 
 uint32_t swapchainImageIndex;
@@ -430,6 +431,8 @@ extern "C" int openxr_cleanup()
   return 0;
 }
 
+std::deque<glm::vec3> z_vec_history;
+
 extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 {
   if (!out) return;
@@ -534,9 +537,35 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
     memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
 
-    glm::vec3 z_vec = glm::vec3(dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10]);
+    glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
 
-    //printf("Left:  %f %f %f %f\n", dat->gaze_mat[8], dat->gaze_mat[9], dat->gaze_mat[10], dat->gaze_mat[11]);
+    float filter_alpha = 0.15;
+    float filter_alpha_iter = (1.0 - filter_alpha);
+    glm::vec3 z_vec_filtered = z_vec * filter_alpha;
+    /*for (int i = 0; i < z_vec_history.size(); i++) {
+      z_vec_filtered += z_vec_history[i] * filter_alpha_iter;
+      filter_alpha_iter *= filter_alpha_iter;
+    }*/
+
+    if (z_vec_history.size()) {
+       z_vec_filtered += z_vec_history[z_vec_history.size()-1] * filter_alpha_iter;
+    }
+    else {
+      z_vec_filtered = z_vec;
+    }
+   
+
+    z_vec_history.push_back(z_vec_filtered);
+
+    if (z_vec_history.size() > 10) {
+      z_vec_history.pop_front();
+    }
+
+    z_vec_filtered = glm::normalize(z_vec_filtered);
+
+    memcpy(dat->gaze_vec, glm::value_ptr(z_vec_filtered), sizeof(dat->gaze_vec));
+
+    printf("Left:  %f %f %f %f\n", z_vec_filtered[0], z_vec_filtered[1], z_vec_filtered[2]);
   }
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));

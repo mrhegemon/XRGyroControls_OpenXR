@@ -151,9 +151,9 @@ class IndigoHIDMessage {
 
         // XYZ ray offset from gaze origin
         // doesn't actually matter, overridden
-        message.write(-pose.gaze_mat.8, at: 0x57) // yaw
-        message.write(-pose.gaze_mat.9, at: 0x5B) // pitch pose.l_ep
-        message.write(-pose.gaze_mat.10, at: 0x5F) // roll pose.l_er
+        message.write(pose.gaze_vec.0, at: 0x57) // yaw
+        message.write(pose.gaze_vec.1, at: 0x5B) // pitch pose.l_ep
+        message.write(pose.gaze_vec.2, at: 0x5F) // roll pose.l_er
         message.write(0.0, at: 0x63)
         
 
