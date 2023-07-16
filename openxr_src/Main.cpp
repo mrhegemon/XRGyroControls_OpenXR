@@ -431,8 +431,6 @@ extern "C" int openxr_cleanup()
   return 0;
 }
 
-std::deque<glm::vec3> z_vec_history;
-
 float offset_x, offset_y, offset_z;
 bool offsets_set = false;
 
@@ -459,7 +457,8 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
   if (!offsets_set) {
     offset_x = eyePose0.pose.position.x;
-    offset_y = eyePose0.pose.position.y + 1.3;
+    //offset_y = /*eyePose0.pose.position.y +*/ 0.2;
+    offset_y = 1.2;
     offset_z = eyePose0.pose.position.z - 0.5;
     offsets_set = true;
   }
@@ -494,6 +493,16 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->view_r[13] = out->r_y;
   out->view_r[14] = out->r_z;
 
+  memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
+  memcpy(out->r_controller, glm::value_ptr(ctrl_r), sizeof(out->r_controller));
+
+  out->l_controller[12] -= offset_x;
+  out->l_controller[13] -= offset_y;
+  out->l_controller[14] -= offset_z;
+  out->r_controller[12] -= offset_x;
+  out->r_controller[13] -= offset_y;
+  out->r_controller[14] -= offset_z;
+
   if (shm_addr) {
     sharedmem_data* dat = (sharedmem_data*)shm_addr;
     dat->l_x  = out->l_x;
@@ -513,32 +522,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     dat->r_qw = out->r_qw;
 
     glm::quat l_q(dat->l_qx, dat->l_qy, dat->l_qz, dat->l_qw);
-    glm::vec3 l_euler = glm::eulerAngles(l_q);// * 3.14159f / 180.f;
-
-    /*if ( l_euler.x > 3.14159f/2.0 )
-        l_euler.x = (3.14159f - l_euler.x);
-    if ( l_euler.y > 3.14159f/2.0 )
-        l_euler.y = (l_euler.y - 3.14159f);
-    if ( l_euler.z > 3.14159f/2.0 )
-        l_euler.z = (3.14159f - l_euler.z);*/
-
-    dat->l_ep = l_euler.z;
-    dat->l_ey = l_euler.y;
-    dat->l_er = l_euler.x;
-
     glm::quat r_q(dat->r_qx, dat->r_qy, dat->r_qz, dat->r_qw);
-    glm::vec3 r_euler = glm::eulerAngles(r_q);// * 3.14159f / 180.f; 
-
-    /*if ( r_euler.x > 3.14159f/2.0 )
-        r_euler.x = (3.14159f - r_euler.x);
-    if ( r_euler.y > 3.14159f/2.0 )
-        r_euler.y = (3.14159f - r_euler.y);
-    if ( r_euler.z > 3.14159f/2.0 )
-        r_euler.z = (3.14159f - r_euler.z);*/
-
-    dat->r_ep = r_euler.z;
-    dat->r_ey = r_euler.y;
-    dat->r_er = r_euler.x;
 
     memcpy(dat->l_view, out->view_l, sizeof(dat->l_view));
     memcpy(dat->r_view, out->view_r, sizeof(dat->r_view));
@@ -550,69 +534,36 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     dat->grip_val[0] = headset->grip_value[0].currentState;
     dat->grip_val[1] = headset->grip_value[1].currentState;
 
-    memcpy(dat->l_controller, glm::value_ptr(ctrl_l), sizeof(dat->l_controller));
-    memcpy(dat->r_controller, glm::value_ptr(ctrl_r), sizeof(dat->r_controller));
+    memcpy(dat->l_controller, out->l_controller, sizeof(dat->l_controller));
+    memcpy(dat->r_controller, out->r_controller, sizeof(dat->r_controller));
     //printf("grabs %f %f\n", dat->grab_val[0], dat->grab_val[1]);
 
     memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
 
-    glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
+    glm::quat gaze_quat = headset->l_eye_quat;
+    gaze_quat = l_q * gaze_quat;
+    dat->gaze_quat[0] = gaze_quat.x;
+    dat->gaze_quat[1] = gaze_quat.y;
+    dat->gaze_quat[2] = gaze_quat.z;
+    dat->gaze_quat[3] = gaze_quat.w;
+    dat->l_controller_quat[0] = headset->tracked_locations[0].pose.orientation.x;
+    dat->l_controller_quat[1] = headset->tracked_locations[0].pose.orientation.y;
+    dat->l_controller_quat[2] = headset->tracked_locations[0].pose.orientation.z;
+    dat->l_controller_quat[3] = headset->tracked_locations[0].pose.orientation.w;
+    dat->r_controller_quat[0] = headset->tracked_locations[1].pose.orientation.x;
+    dat->r_controller_quat[1] = headset->tracked_locations[1].pose.orientation.y;
+    dat->r_controller_quat[2] = headset->tracked_locations[1].pose.orientation.z;
+    dat->r_controller_quat[3] = headset->tracked_locations[1].pose.orientation.w;
 
-    dat->l_controller[12] -= offset_x;
-    dat->l_controller[13] -= offset_y;
-    dat->l_controller[14] -= offset_z;
-    dat->r_controller[12] -= offset_x;
-    dat->r_controller[13] -= offset_y;
-    dat->r_controller[14] -= offset_z;
+    glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
 
     dat->system_button = headset->system_button ? 1 : 0;
     dat->menu_button = headset->menu_button ? 1 : 0;
     dat->left_touch_button = headset->left_touch_button ? 1 : 0;
     dat->right_touch_button = headset->right_touch_button ? 1 : 0;
 
-    //dat->gaze_mat[12] -= offset_x;
-    //dat->gaze_mat[13] -= offset_y;
-    //dat->gaze_mat[14] -= offset_z;
-    //printf("system %x\n", dat->system_button);
-
-#if 0
-    float filter_alpha = 0.15;
-    float filter_alpha_iter = (1.0 - filter_alpha);
-    glm::vec3 z_vec_filtered = z_vec * filter_alpha;
-    /*for (int i = 0; i < z_vec_history.size(); i++) {
-      z_vec_filtered += z_vec_history[i] * filter_alpha_iter;
-      filter_alpha_iter *= filter_alpha_iter;
-    }*/
-
-    if (z_vec_history.size()) {
-       z_vec_filtered += z_vec_history[z_vec_history.size()-1] * filter_alpha_iter;
-    }
-    else {
-      z_vec_filtered = z_vec;
-    }
-   
-
-    z_vec_history.push_back(z_vec_filtered);
-
-    if (z_vec_history.size() > 10) {
-      z_vec_history.pop_front();
-    }
-
-    z_vec_filtered = glm::normalize(z_vec_filtered);
-#endif
-
     memcpy(dat->gaze_vec, glm::value_ptr(z_vec), sizeof(dat->gaze_vec));
 
     //printf("Left:  %f %f %f %f\n", z_vec_filtered[0], z_vec_filtered[1], z_vec_filtered[2]);
   }
-
-  memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
-  memcpy(out->r_controller, glm::value_ptr(ctrl_r), sizeof(out->r_controller));
-
-  out->l_controller[12] -= offset_x;
-  out->l_controller[13] -= offset_y;
-  out->l_controller[14] -= offset_z;
-  out->r_controller[12] -= offset_x;
-  out->r_controller[13] -= offset_y;
-  out->r_controller[14] -= offset_z;
 }

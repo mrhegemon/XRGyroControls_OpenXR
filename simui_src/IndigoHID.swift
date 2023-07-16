@@ -12,6 +12,22 @@ class IndigoHIDMessage {
     /// You must NOT change the length to anything other than 0xC0
     public var data: [UInt8] = []
     public static var default_gaze: Int = 0
+    public static var gaze_x1: Float = 0.0
+    public static var gaze_y1: Float = 0.0
+    public static var gaze_z1: Float = 0.0
+
+    public static var gaze_x2: Float = 0.0
+    public static var gaze_y2: Float = 0.0
+    public static var gaze_z2: Float = 0.0
+
+    public static var gaze_qx: Float = 0.0
+    public static var gaze_qy: Float = 0.0
+    public static var gaze_qz: Float = 0.0
+    public static var gaze_qw: Float = 0.0
+
+    public static var gaze_hud_x: Float = 0.0
+    public static var gaze_hud_y: Float = 0.0
+    public static var gaze_hud_z: Float = 0.0
 
     public func as_struct() -> UnsafeMutablePointer<IndigoHIDMessageStruct> {
         //print("data: \(data)")
@@ -167,62 +183,88 @@ class IndigoHIDMessage {
         if (which_gaze == 3)
         {
             // Gaze fixed to center of vision
-            // (I assume) gaze origin
-            message.write(pose.l_x, at: 0x47)
-            message.write(pose.l_y, at: 0x4B)
-            message.write(pose.l_z, at: 0x4F)
-            message.write(0.0,      at: 0x53)
+            gaze_x1 = pose.l_x
+            gaze_y1 = pose.l_y
+            gaze_z1 = pose.l_z
 
-            // XYZ ray offset from gaze origin
-            message.write(-pose.l_view.8, at: 0x57) // yaw
-            message.write(-pose.l_view.9, at: 0x5B) // pitch pose.l_ep
-            message.write(-pose.l_view.10, at: 0x5F) // roll pose.l_er
-            message.write(1.0, at: 0x63)
+            gaze_x2 = -pose.l_view.8
+            gaze_y2 = -pose.l_view.9
+            gaze_z2 = -pose.l_view.10
+
+            gaze_qx = pose.l_qx
+            gaze_qy = pose.l_qy
+            gaze_qz = pose.l_qz
+            gaze_qw = pose.l_qw
         }
         else if (which_gaze == 2)
         {
             // Gaze fixed to right controller
-            // (I assume) gaze origin
-            message.write(pose.r_controller.12, at: 0x47)
-            message.write(pose.r_controller.13, at: 0x4B)
-            message.write(pose.r_controller.14, at: 0x4F)
-            message.write(0.0,      at: 0x53)
+            gaze_x1 = pose.r_controller.12
+            gaze_y1 = pose.r_controller.13
+            gaze_z1 = pose.r_controller.14
 
-            // XYZ ray offset from gaze origin
-            message.write(-pose.r_controller.8, at: 0x57) // yaw
-            message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
-            message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
-            message.write(0.0, at: 0x63)
+            gaze_x2 = -pose.r_controller.8
+            gaze_y2 = -pose.r_controller.9
+            gaze_z2 = -pose.r_controller.10
+
+            gaze_qx = pose.r_controller_quat.0
+            gaze_qy = pose.r_controller_quat.1
+            gaze_qz = pose.r_controller_quat.2
+            gaze_qw = pose.r_controller_quat.3
         }
         else if (which_gaze == 1)
         {
             // Gaze fixed to left controller
-            // (I assume) gaze origin
-            message.write(pose.l_controller.12, at: 0x47)
-            message.write(pose.l_controller.13, at: 0x4B)
-            message.write(pose.l_controller.14, at: 0x4F)
-            message.write(0.0,      at: 0x53)
+            gaze_x1 = pose.l_controller.12
+            gaze_y1 = pose.l_controller.13
+            gaze_z1 = pose.l_controller.14
 
-            // XYZ ray offset from gaze origin
-            message.write(-pose.l_controller.8, at: 0x57) // yaw
-            message.write(-pose.l_controller.9, at: 0x5B) // pitch pose.l_ep
-            message.write(-pose.l_controller.10, at: 0x5F) // roll pose.l_er
-            message.write(0.0, at: 0x63)
+            gaze_x2 = -pose.l_controller.8
+            gaze_y2 = -pose.l_controller.9
+            gaze_z2 = -pose.l_controller.10
+
+            gaze_qx = pose.l_controller_quat.0
+            gaze_qy = pose.l_controller_quat.1
+            gaze_qz = pose.l_controller_quat.2
+            gaze_qw = pose.l_controller_quat.3
         }
         else {
             // Gaze fixed to eye tracking
-            // (I assume) gaze origin
-            message.write(pose.l_x, at: 0x47)
-            message.write(pose.l_y, at: 0x4B)
-            message.write(pose.l_z, at: 0x4F)
-            message.write(0.0,      at: 0x53)
+            gaze_x1 = pose.l_x
+            gaze_y1 = pose.l_y
+            gaze_z1 = pose.l_z
 
-            // XYZ ray offset from gaze origin
-            message.write(pose.gaze_vec.0, at: 0x57) // yaw
-            message.write(pose.gaze_vec.1, at: 0x5B) // pitch pose.l_ep
-            message.write(pose.gaze_vec.2, at: 0x5F) // roll pose.l_er
-            message.write(0.0, at: 0x63)
+            gaze_x2 = pose.gaze_vec.0
+            gaze_y2 = pose.gaze_vec.1
+            gaze_z2 = pose.gaze_vec.2
+
+            gaze_qx = pose.gaze_quat.0
+            gaze_qy = pose.gaze_quat.1
+            gaze_qz = pose.gaze_quat.2
+            gaze_qw = pose.gaze_quat.3
+
+            /*gaze_qx = pose.l_qx
+            gaze_qy = pose.l_qy
+            gaze_qz = pose.l_qz
+            gaze_qw = pose.l_qw*/
         }
+
+        // Gaze fixed to eye tracking
+        // (I assume) gaze origin
+        message.write(gaze_x1, at: 0x47)
+        message.write(gaze_y1, at: 0x4B)
+        message.write(gaze_z1, at: 0x4F)
+        message.write(0.0,      at: 0x53)
+
+        // XYZ ray offset from gaze origin
+        message.write(gaze_x2, at: 0x57) // yaw
+        message.write(gaze_y2, at: 0x5B) // pitch pose.l_ep
+        message.write(gaze_z2, at: 0x5F) // roll pose.l_er
+        message.write(1.0, at: 0x63)
+
+        //gaze_x1 += gaze_x2 * 1.0
+        //gaze_y1 += gaze_y2 * 1.0
+        //gaze_z1 += gaze_z2 * 1.0
 
         // Touch ray origin
         message.write(pose.l_controller.12, at: 0x67)
@@ -263,7 +305,7 @@ class IndigoHIDMessage {
         message.write(qx, at: 0x64)
         message.write(qy, at: 0x68)
         message.write(qz, at: 0x6C)
-        message.write(qw, at: 0x70) // Not sure why, but this is important
+        message.write(qw, at: 0x70)
 
         return message
     }

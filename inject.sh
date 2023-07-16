@@ -1,6 +1,8 @@
 #!/bin/bash
 PWD=$(pwd)
 
+#xcrun simctl spawn booted defaults delete com.apple.RealitySimulation AllowImmersiveVirtualHands
+
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation AllowImmersiveVirtualHands 1
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation ShowCursor 1
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation VirtualDisplayRefreshRate 10

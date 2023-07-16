@@ -1082,6 +1082,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   glm::mat4 l_view_no_rot = eyeViewMatrices.at(0);
   l_view_no_rot[3] = glm::vec4(0, 0, 0, 1);
   l_eye_mat = l_view_no_rot * l_eye_mat;
+  l_eye_quat = l_q;
 
   glm::quat r_q(ql_xrsp_sidechannel_eye_r_orient[3], ql_xrsp_sidechannel_eye_r_orient[0], ql_xrsp_sidechannel_eye_r_orient[1], ql_xrsp_sidechannel_eye_r_orient[2]);
   r_eye_mat = glm::toMat4(r_q);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/mat4x4.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -58,6 +59,8 @@ public:
   bool left_touch_button = false;
   bool right_touch_button = false;
 
+  glm::quat l_eye_quat;
+  glm::quat r_eye_quat;
   glm::mat4 l_eye_mat;
   glm::mat4 r_eye_mat;
 

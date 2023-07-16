@@ -35,6 +35,13 @@ static simd_float4x4 gWorldMat = {.columns = {
                                             {0, 2.0, 0, 1},
                                         }};
 
+static simd_float4x4 gNewWorldMat = {.columns = {
+                                            {1, 0, 0, 0},
+                                            {0, 1, 0, 0},
+                                            {0, 0, 1, 0},
+                                            {0, 0.0, 0, 1},
+                                        }};
+
 static simd_float4x4 left_controller_pose;
 static simd_float4x4 right_controller_pose;
 
@@ -161,6 +168,7 @@ static void hook_RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a)
 {
   //printf("asdf\n");
   gWorldMat = a;
+  //RETransformComponentSetWorldMatrix4x4F(gIdentityMat);
   RETransformComponentSetWorldMatrix4x4F(a);
 }
 
@@ -292,7 +300,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   // Y is +up/-down
   // Z is -forward/+back
   left_eye_pos[0] = xr_data.l_x;
-  left_eye_pos[1] = xr_data.l_y ;
+  left_eye_pos[1] = xr_data.l_y;
   left_eye_pos[2] = xr_data.l_z;
   left_eye_pos[3] = 0.0;
 
@@ -471,13 +479,34 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     rightView->tangents = tangents_r;
   }
 
+  gNewWorldMat = gIdentityMat;
+  /*gNewWorldMat.columns[3][0] = view_mat_l.columns[3][0];
+  gNewWorldMat.columns[3][1] = view_mat_l.columns[3][1];
+  gNewWorldMat.columns[3][2] = view_mat_l.columns[3][2];
+  gNewWorldMat.columns[3][3] = view_mat_l.columns[3][3];
+
+  view_mat_r.columns[3][0] -= view_mat_l.columns[3][0];
+  view_mat_r.columns[3][1] -= view_mat_l.columns[3][1];
+  view_mat_r.columns[3][2] -= view_mat_l.columns[3][2];
+  view_mat_r.columns[3][3] -= view_mat_l.columns[3][3];
+
+  view_mat_l.columns[3][0] = 0.0;
+  view_mat_l.columns[3][1] = 0.0;
+  view_mat_l.columns[3][2] = 0.0;
+  view_mat_l.columns[3][3] = 0.0;*/
+
+  gRightEyeMatrix.columns[3][0] = view_mat_r.columns[3][0] - view_mat_l.columns[3][0];
+  gRightEyeMatrix.columns[3][1] = view_mat_r.columns[3][1] - view_mat_l.columns[3][1];
+  gRightEyeMatrix.columns[3][2] = view_mat_r.columns[3][2] - view_mat_l.columns[3][2];
+  gRightEyeMatrix.columns[3][3] = view_mat_r.columns[3][3] - view_mat_l.columns[3][3];
+
   simView->transform = view_mat_l;
 #ifdef SEPARATE_LEFT_EYE_VIEW
   leftView->transform = view_mat_l;
 #endif
   rightView->transform = view_mat_r;
-  //leftView->transform = gIdentityMat;
-  //rightView->transform = gRightEyeMatrix;
+  simView->transform = gIdentityMat;
+  rightView->transform = gRightEyeMatrix;
 
   left_eye_zbasis[0] = view_mat_l.columns[2][0];
   left_eye_zbasis[1] = view_mat_l.columns[2][1];
@@ -550,6 +579,24 @@ void hook_RFAnchorPtrGetIndexTipTransform(void* a) {
   RFAnchorPtrGetIndexTipTransform(a);
 }
 DYLD_INTERPOSE(hook_RFAnchorPtrGetIndexTipTransform, RFAnchorPtrGetIndexTipTransform);
+#endif
+
+#if 0
+extern int __extractTargetTimes(void*, void* ,void*);
+int hook__extractTargetTimes(void* a, void* b, void* c)
+{
+  return __extractTargetTimes(a,b,c);
+}
+#endif
+//DYLD_INTERPOSE(hook__extractTargetTimes, _extractTargetTimes);
+
+#if 0
+void __WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__();
+void hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__()
+{
+
+}
+//DYLD_INTERPOSE(hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__, __WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__);
 #endif
 
 void cp_drawable_present(cp_drawable_t drawable);
@@ -634,6 +681,12 @@ static void hook_sleep(unsigned int a) {
 }
 DYLD_INTERPOSE(hook_sleep, sleep);
 #endif
+
+static void hook_mach_wait_until(void* a)
+{
+
+}
+DYLD_INTERPOSE(hook_mach_wait_until, mach_wait_until);
 
 #if 0
 void RERenderFrameSettingsSetTotalTime(void* re, float time);
@@ -733,6 +786,10 @@ static int (*real_RSXRRenderLoop_currentFrequency)(void* self);
 static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   int ret = real_RSXRRenderLoop_currentFrequency(self);
   //printf("frequency at %d\n", ret);
+  //printf("%f\n", *(double *)(self + 0x188));
+  //*(int *)(self + 0x140) = 2; //overcomitted
+  //*(int *)(self + 0x144) = 1;
+  //*(double *)(self + 0x188) = 0.08; //max frametime
   *(int*)((intptr_t)self + 0x1EC) = 120;
   return 120;
 }
@@ -740,6 +797,7 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
 @interface RSSimulatedHeadset
 - (void)getEyePose:(struct RSSimulatedHeadsetPose*)pose:(int)forEye;
 - (void)setEyePose:(struct RSSimulatedHeadsetPose)pose:(int)forEye;
+- (void)setHMDPose:(struct RSSimulatedHeadsetPose)pose;
 @end
 
 static void (*real_RSSimulatedHeadset_getEyePose)(RSSimulatedHeadset* self, SEL sel,
@@ -757,8 +815,8 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose->position = right_eye_pos;
     pose->rotation = right_eye_quat;
-  }
-  else if (forEye == 2)
+  }*/
+  /*else if (forEye == 2)
   {
     pose->position = left_eye_pos;
     pose->rotation = left_eye_quat;
@@ -780,14 +838,27 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose.position = right_eye_pos;
     pose.rotation = right_eye_quat;
-  }
-  else if (forEye == 2)
+  }*/
+  /*else if (forEye == 2)
   {
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
   }*/
 
   real_RSSimulatedHeadset_setEyePose(self, sel, pose, forEye);
+  
+  //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
+}
+
+static void (*real_RSSimulatedHeadset_setHMDPose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose pose);
+static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel,
+                                               struct RSSimulatedHeadsetPose pose) {
+
+  pose.position = left_eye_pos;
+  pose.rotation = left_eye_quat;
+
+  real_RSSimulatedHeadset_setHMDPose(self, sel, pose);
   
   //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
 }
@@ -830,6 +901,13 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     Method method = class_getInstanceMethod(cls, @selector(setEyePose:forEye:));
     real_RSSimulatedHeadset_setEyePose = (void*)method_getImplementation(method);
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setEyePose);
+  }
+
+  {
+    Class cls = NSClassFromString(@"RSSimulatedHeadset");
+    Method method = class_getInstanceMethod(cls, @selector(setHMDPose:));
+    real_RSSimulatedHeadset_setHMDPose = (void*)method_getImplementation(method);
+    method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setHMDPose);
   }
 
   {
