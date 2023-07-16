@@ -350,7 +350,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     {
       for (int j = 0; j < 4; j++)
       {
-        view_mat_r.columns[i][j] = xr_data.view_r[(i*4)+j];
+        view_mat_r.columns[i][j] = xr_data.view_r_rel[(i*4)+j];
         /*if (j == 2) {
           rightView->transform.columns[i][j] *= -1.0;
         }*/
@@ -479,7 +479,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     rightView->tangents = tangents_r;
   }
 
-  gNewWorldMat = gIdentityMat;
+  //gNewWorldMat = gIdentityMat;
   /*gNewWorldMat.columns[3][0] = view_mat_l.columns[3][0];
   gNewWorldMat.columns[3][1] = view_mat_l.columns[3][1];
   gNewWorldMat.columns[3][2] = view_mat_l.columns[3][2];
@@ -504,9 +504,10 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 #ifdef SEPARATE_LEFT_EYE_VIEW
   leftView->transform = view_mat_l;
 #endif
+  gNewWorldMat = view_mat_l;
   rightView->transform = view_mat_r;
   simView->transform = gIdentityMat;
-  rightView->transform = gRightEyeMatrix;
+  //rightView->transform = gRightEyeMatrix;
 
   left_eye_zbasis[0] = view_mat_l.columns[2][0];
   left_eye_zbasis[1] = view_mat_l.columns[2][1];

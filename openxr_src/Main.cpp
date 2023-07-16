@@ -458,7 +458,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   if (!offsets_set) {
     offset_x = eyePose0.pose.position.x;
     //offset_y = /*eyePose0.pose.position.y +*/ 0.2;
-    offset_y = 1.2;
+    offset_y = 1.22;
     offset_z = eyePose0.pose.position.z - 0.5;
     offsets_set = true;
   }
@@ -492,6 +492,9 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->view_r[12] = out->r_x;
   out->view_r[13] = out->r_y;
   out->view_r[14] = out->r_z;
+
+  glm::mat4 view_r_rel = glm::inverse(headset->eyeViewMatrices.at(0)) * headset->eyeViewMatrices.at(1);
+  memcpy(out->view_r_rel, glm::value_ptr(view_r_rel), sizeof(out->view_r_rel));
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
   memcpy(out->r_controller, glm::value_ptr(ctrl_r), sizeof(out->r_controller));

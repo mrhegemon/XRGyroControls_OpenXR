@@ -34,6 +34,8 @@ typedef struct openxr_headset_data
 
   float l_controller[16];
   float r_controller[16];
+
+  float view_r_rel[16];
 } openxr_headset_data;
 
 //#define EYE_CURSOR
