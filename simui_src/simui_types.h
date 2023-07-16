@@ -44,6 +44,8 @@ typedef struct sharedmem_data
 
   int system_button;
   int menu_button;
+  int left_touch_button;
+  int right_touch_button;
 } sharedmem_data;
 
 #ifdef __cplusplus

@@ -109,9 +109,9 @@ class IndigoHIDMessage {
         message.write(3, at: 0x34) // size of the next 3 bytes, setting this high causes a stack overflow in backboardd lol
         
         // [3C]
-        message.data[0x38] = pose.grab_val.0 > 0.75 ? 1 : 0 // ?
+        message.data[0x38] = pose.grab_val.0 > 0.75 ? 1 : 0 // pinch left
         message.data[0x39] = 2
-        message.data[0x3A] = 0 // ?
+        message.data[0x3A] = pose.left_touch_button != 0 ? 1 : 0 // ?
 
         // I
         message.write(3, at: 0x3B) // size of the next 3 bytes, setting this high causes a stack overflow in backboardd lol
@@ -119,7 +119,7 @@ class IndigoHIDMessage {
         // [3C]
         message.data[0x3F] = pose.grab_val.1 > 0.75 ? 1 : 0 // pinch right
         message.data[0x40] = 1 // UInt8(test & 0xFF)
-        message.data[0x41] = 0 // ?
+        message.data[0x41] = pose.right_touch_button != 0 ? 1 : 0 // ?
 
         // u8 0x42
         message.data[0x42] = 0

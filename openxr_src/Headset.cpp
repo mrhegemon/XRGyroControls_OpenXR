@@ -403,10 +403,20 @@ Headset::Headset(const Context* context) : context(context)
   xrStringToPath(xrInstance, "/user/hand/right/input/system/click",
                  &system_click_path[HAND_RIGHT_INDEX]);
 
-   xrStringToPath(xrInstance, "/user/hand/left/input/menu/click",
+  xrStringToPath(xrInstance, "/user/hand/left/input/menu/click",
                  &menu_click_path[HAND_LEFT_INDEX]);
   xrStringToPath(xrInstance, "/user/hand/right/input/menu/click",
                  &menu_click_path[HAND_RIGHT_INDEX]);
+
+  xrStringToPath(xrInstance, "/user/hand/left/input/b/click",
+                 &b_click_path[HAND_LEFT_INDEX]);
+  xrStringToPath(xrInstance, "/user/hand/right/input/b/click",
+                 &b_click_path[HAND_RIGHT_INDEX]);
+
+  xrStringToPath(xrInstance, "/user/hand/left/input/y/click",
+                 &y_click_path[HAND_LEFT_INDEX]);
+  xrStringToPath(xrInstance, "/user/hand/right/input/y/click",
+                 &y_click_path[HAND_RIGHT_INDEX]);
 
   
   xrStringToPath(xrInstance, "/user/hand/left/input/trigger/value",
@@ -510,6 +520,20 @@ Headset::Headset(const Context* context) : context(context)
     //  return 1;
   }
 
+  {
+    XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
+                                      .next = NULL,
+                                      .actionType = XR_ACTION_TYPE_BOOLEAN_INPUT,
+                                      .countSubactionPaths = HAND_COUNT,
+                                      .subactionPaths = hand_paths};
+    strcpy(action_info.actionName, "byactionbool");
+    strcpy(action_info.localizedActionName, "Touching Button");
+
+    result = xrCreateAction(gameplay_actionset, &action_info, &b_y_action_bool);
+    //if (!XR_SUCCEEDED(result))
+    //  return 1;
+  }
+
   
   {
     XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
@@ -543,6 +567,8 @@ Headset::Headset(const Context* context) : context(context)
         {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_LEFT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
+        {.action = b_y_action_bool, .binding = b_click_path[HAND_LEFT_INDEX]},
+        {.action = b_y_action_bool, .binding = b_click_path[HAND_RIGHT_INDEX]},
     };
 
     const XrInteractionProfileSuggestedBinding suggested_bindings = {
@@ -576,6 +602,8 @@ Headset::Headset(const Context* context) : context(context)
         {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
         {.action = system_action_bool, .binding = menu_click_path[HAND_LEFT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
+        {.action = b_y_action_bool, .binding = y_click_path[HAND_LEFT_INDEX]},
+        {.action = b_y_action_bool, .binding = b_click_path[HAND_RIGHT_INDEX]},
     };
 
     const XrInteractionProfileSuggestedBinding suggested_bindings = {
@@ -863,6 +891,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
   system_button = false;
   menu_button = false;
+  left_touch_button = false;
+  right_touch_button = false;
 
   for (int i = 0; i < HAND_COUNT; i++) {
     XrActionStatePose hand_pose_state = {.type = XR_TYPE_ACTION_STATE_POSE, .next = NULL};
@@ -956,6 +986,27 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
       }
       else if (system_value[i].currentState && i == HAND_RIGHT_INDEX) {
         system_button = true;
+      }
+    }
+
+    b_y_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
+    b_y_value[i].next = NULL;
+    {
+      XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                       .next = NULL,
+                                       .action = b_y_action_bool,
+                                       .subactionPath = hand_paths[i]};
+
+      
+      result = xrGetActionStateBoolean(session, &get_info, &b_y_value[i]);
+      //xr_check(instance, result, "failed to get grab value!");
+
+      //printf("system %u, %x\n", i, system_value[i].currentState);
+      if (b_y_value[i].currentState && i == HAND_LEFT_INDEX) {
+        left_touch_button = true;
+      }
+      else if (b_y_value[i].currentState && i == HAND_RIGHT_INDEX) {
+        right_touch_button = true;
       }
     }
   };

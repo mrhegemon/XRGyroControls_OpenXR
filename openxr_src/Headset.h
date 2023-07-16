@@ -47,6 +47,7 @@ public:
   XrActionStateFloat grab_value[HAND_COUNT];
   XrActionStateFloat grip_value[HAND_COUNT];
   XrActionStateBoolean system_value[HAND_COUNT];
+  XrActionStateBoolean b_y_value[HAND_COUNT];
   XrSpaceLocation tracked_locations[64];
   XrActionSet gameplay_actionset;
 
@@ -54,6 +55,8 @@ public:
   bool pinch_r;
   bool system_button;
   bool menu_button;
+  bool left_touch_button = false;
+  bool right_touch_button = false;
 
   glm::mat4 l_eye_mat;
   glm::mat4 r_eye_mat;
@@ -66,6 +69,8 @@ public:
   XrPath select_click_path[HAND_COUNT];
   XrPath system_click_path[HAND_COUNT];
   XrPath menu_click_path[HAND_COUNT];
+  XrPath b_click_path[HAND_COUNT];
+  XrPath y_click_path[HAND_COUNT];
 
   XrHandTrackerEXT leftHandTracker;
   XrHandTrackerEXT rightHandTracker;
@@ -124,6 +129,7 @@ private:
   XrAction grab_action_float;
   XrAction grip_action_float;
   XrAction system_action_bool;
+  XrAction b_y_action_bool;
   XrAction haptic_action;
   XrPath hand_paths[HAND_COUNT];
 

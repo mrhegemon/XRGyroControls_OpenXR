@@ -567,6 +567,8 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
     dat->system_button = headset->system_button ? 1 : 0;
     dat->menu_button = headset->menu_button ? 1 : 0;
+    dat->left_touch_button = headset->left_touch_button ? 1 : 0;
+    dat->right_touch_button = headset->right_touch_button ? 1 : 0;
 
     //dat->gaze_mat[12] -= offset_x;
     //dat->gaze_mat[13] -= offset_y;
