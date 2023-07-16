@@ -11,6 +11,7 @@ import CoreSimulator
 class IndigoHIDMessage {
     /// You must NOT change the length to anything other than 0xC0
     public var data: [UInt8] = []
+    public static var default_gaze: Int = 0
 
     public func as_struct() -> UnsafeMutablePointer<IndigoHIDMessageStruct> {
         //print("data: \(data)")
@@ -125,8 +126,44 @@ class IndigoHIDMessage {
         message.data[0x42] = 0
         message.write(Int16(0), at: 0x43)
         message.write(Int16(0), at: 0x45)
-        
+
+        if (pose.menu_button != 0 ) {
+            if (pose.grip_val.0 > 0.75 && pose.grip_val.1 > 0.75)
+            {
+                default_gaze = 3
+            }
+            else if (pose.grip_val.1 > 0.75)
+            {
+                default_gaze = 2
+            }
+            else if (pose.grip_val.0 > 0.75)
+            {
+                default_gaze = 1
+            }
+            else {
+                default_gaze = 0
+            }
+        }
+
+        var which_gaze: Int = default_gaze
+
         if (pose.grip_val.0 > 0.75 && pose.grip_val.1 > 0.75)
+        {
+            which_gaze = 3
+        }
+        else if (pose.grip_val.1 > 0.75)
+        {
+            which_gaze = 2
+        }
+        else if (pose.grip_val.0 > 0.75)
+        {
+            which_gaze = 1
+        }
+        else {
+            which_gaze = default_gaze
+        }
+        
+        if (which_gaze == 3)
         {
             // Gaze fixed to center of vision
             // (I assume) gaze origin
@@ -141,7 +178,7 @@ class IndigoHIDMessage {
             message.write(-pose.l_view.10, at: 0x5F) // roll pose.l_er
             message.write(1.0, at: 0x63)
         }
-        else if (pose.grip_val.1 > 0.75)
+        else if (which_gaze == 2)
         {
             // Gaze fixed to right controller
             // (I assume) gaze origin
@@ -156,7 +193,7 @@ class IndigoHIDMessage {
             message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
             message.write(0.0, at: 0x63)
         }
-        else if (pose.grip_val.0 > 0.75)
+        else if (which_gaze == 1)
         {
             // Gaze fixed to left controller
             // (I assume) gaze origin
