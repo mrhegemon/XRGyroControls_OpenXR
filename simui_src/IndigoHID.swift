@@ -102,6 +102,7 @@ class IndigoHIDMessage {
         
         let message = IndigoHIDMessage()
         
+        // Could maybe be moved to an rcp::generate_synthetic_events hook? (RealitySystemSupport)
         message.write(302, at: 0x30)
 
         //print("Test is:", test)

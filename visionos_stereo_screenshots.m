@@ -518,7 +518,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
 
 DYLD_INTERPOSE(hook_cp_drawable_encode_present, cp_drawable_encode_present);
 
-#if 1
+#if 0
 int RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose);
 int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* pose) {
   int ret = RCPHIDEventGetSelectionRay(ctx, pose);
@@ -542,6 +542,14 @@ int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* po
   return ret;
 }
 DYLD_INTERPOSE(hook_RCPHIDEventGetSelectionRay, RCPHIDEventGetSelectionRay);
+#endif
+
+#if 0
+void RFAnchorPtrGetIndexTipTransform(void*);
+void hook_RFAnchorPtrGetIndexTipTransform(void* a) {
+  RFAnchorPtrGetIndexTipTransform(a);
+}
+DYLD_INTERPOSE(hook_RFAnchorPtrGetIndexTipTransform, RFAnchorPtrGetIndexTipTransform);
 #endif
 
 void cp_drawable_present(cp_drawable_t drawable);

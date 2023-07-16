@@ -55,7 +55,7 @@ add_library(Sim2OpenXR
   visionos_stereo_screenshots.m
 )
 #target_link_libraries(OpenXRCpp PRIVATE -framework Metal -framework CompositorServices)
-target_link_options(Sim2OpenXR PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator -Wl,-U,_RCPHIDEventGetSelectionRay)
+target_link_options(Sim2OpenXR PRIVATE -isysroot "/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator -Wl,-U,_RCPHIDEventGetSelectionRay, -Wl,-U,_RFAnchorPtrGetIndexTipTransform)
 
 set_source_files_properties(visionos_stereo_screenshots.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc -isysroot \"/Applications/Xcode-beta.app/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk\"")
 
