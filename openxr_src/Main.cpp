@@ -433,6 +433,9 @@ extern "C" int openxr_cleanup()
 
 std::deque<glm::vec3> z_vec_history;
 
+float offset_x, offset_y, offset_z;
+bool offsets_set = false;
+
 extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 {
   if (!out) return;
@@ -454,17 +457,24 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   const XrView& eyePose0 = headset->eyePoses.at(0);
   const XrView& eyePose1 = headset->eyePoses.at(1);
 
-  out->l_x  = eyePose0.pose.position.x;
-  out->l_y  = eyePose0.pose.position.y;
-  out->l_z  = eyePose0.pose.position.z;
+  if (!offsets_set) {
+    offset_x = eyePose0.pose.position.x;
+    offset_y = eyePose0.pose.position.y + 1.3;
+    offset_z = eyePose0.pose.position.z - 0.5;
+    offsets_set = true;
+  }
+
+  out->l_x  = eyePose0.pose.position.x - offset_x;
+  out->l_y  = eyePose0.pose.position.y - offset_y;
+  out->l_z  = eyePose0.pose.position.z - offset_z;
   out->l_qx = eyePose0.pose.orientation.x;
   out->l_qy = eyePose0.pose.orientation.y;
   out->l_qz = eyePose0.pose.orientation.z;
   out->l_qw = eyePose0.pose.orientation.w;
 
-  out->r_x  = eyePose1.pose.position.x;
-  out->r_y  = eyePose1.pose.position.y;
-  out->r_z  = eyePose1.pose.position.z;
+  out->r_x  = eyePose1.pose.position.x - offset_x;
+  out->r_y  = eyePose1.pose.position.y - offset_y;
+  out->r_z  = eyePose1.pose.position.z - offset_z;
   out->r_qx = eyePose1.pose.orientation.x;
   out->r_qy = eyePose1.pose.orientation.y;
   out->r_qz = eyePose1.pose.orientation.z;
@@ -476,6 +486,13 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->proj_r = glm::value_ptr(headset->eyeProjectionMatrices.at(1));
   out->tangents_l = headset->eyeTangents_l;
   out->tangents_r = headset->eyeTangents_r;
+
+  out->view_l[12] = out->l_x;
+  out->view_l[13] = out->l_y;
+  out->view_l[14] = out->l_z;
+  out->view_r[12] = out->r_x;
+  out->view_r[13] = out->r_y;
+  out->view_r[14] = out->r_z;
 
   if (shm_addr) {
     sharedmem_data* dat = (sharedmem_data*)shm_addr;
@@ -530,6 +547,8 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     //dat->grab_val[1] = headset->pinch_r ? 0.9 : 0.0;//headset->grab_value[1].currentState;
     dat->grab_val[0] = headset->grab_value[0].currentState;
     dat->grab_val[1] = headset->grab_value[1].currentState;
+    dat->grip_val[0] = headset->grip_value[0].currentState;
+    dat->grip_val[1] = headset->grip_value[1].currentState;
 
     memcpy(dat->l_controller, glm::value_ptr(ctrl_l), sizeof(dat->l_controller));
     memcpy(dat->r_controller, glm::value_ptr(ctrl_r), sizeof(dat->r_controller));
@@ -538,6 +557,21 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
 
     glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
+
+    dat->l_controller[12] -= offset_x;
+    dat->l_controller[13] -= offset_y;
+    dat->l_controller[14] -= offset_z;
+    dat->r_controller[12] -= offset_x;
+    dat->r_controller[13] -= offset_y;
+    dat->r_controller[14] -= offset_z;
+
+    dat->system_button = headset->system_button ? 1 : 0;
+    dat->menu_button = headset->menu_button ? 1 : 0;
+
+    //dat->gaze_mat[12] -= offset_x;
+    //dat->gaze_mat[13] -= offset_y;
+    //dat->gaze_mat[14] -= offset_z;
+    //printf("system %x\n", dat->system_button);
 
 #if 0
     float filter_alpha = 0.15;
@@ -572,4 +606,11 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
   memcpy(out->r_controller, glm::value_ptr(ctrl_r), sizeof(out->r_controller));
+
+  out->l_controller[12] -= offset_x;
+  out->l_controller[13] -= offset_y;
+  out->l_controller[14] -= offset_z;
+  out->r_controller[12] -= offset_x;
+  out->r_controller[13] -= offset_y;
+  out->r_controller[14] -= offset_z;
 }

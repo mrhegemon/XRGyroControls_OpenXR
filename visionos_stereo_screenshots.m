@@ -292,7 +292,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   // Y is +up/-down
   // Z is -forward/+back
   left_eye_pos[0] = xr_data.l_x;
-  left_eye_pos[1] = xr_data.l_y - 1.5;
+  left_eye_pos[1] = xr_data.l_y ;
   left_eye_pos[2] = xr_data.l_z;
   left_eye_pos[3] = 0.0;
 
@@ -302,7 +302,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   left_eye_quat[3] = xr_data.l_qw;
 
   right_eye_pos[0] = xr_data.r_x;
-  right_eye_pos[1] = xr_data.r_y - 1.5;
+  right_eye_pos[1] = xr_data.r_y;
   right_eye_pos[2] = xr_data.r_z;
   right_eye_pos[3] = 0.0;
 
@@ -386,10 +386,10 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   view_mat_l.columns[3][2] = 0.0;*/
 
   // idk
-  view_mat_l.columns[3][1] -= 1.5f;
-  view_mat_r.columns[3][1] -= 1.5f;
-  left_controller_pose.columns[3][1] -= 1.5f;
-  right_controller_pose.columns[3][1] -= 1.5f;
+  //view_mat_l.columns[3][1] -= 1.5f;
+  //view_mat_r.columns[3][1] -= 1.5f;
+  //left_controller_pose.columns[3][1] -= 1.5f;
+  //right_controller_pose.columns[3][1] -= 1.5f;
   
   for (int i = 0; i < 0x20; i += 4)
   {

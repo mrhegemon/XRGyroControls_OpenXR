@@ -35,11 +35,15 @@ typedef struct sharedmem_data
   float r_view[16];
 
   float grab_val[2];
+  float grip_val[2];
 
   float l_controller[16];
   float r_controller[16];
   float gaze_mat[16];
   float gaze_vec[3];
+
+  int system_button;
+  int menu_button;
 } sharedmem_data;
 
 #ifdef __cplusplus

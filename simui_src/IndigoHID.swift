@@ -11,7 +11,7 @@ import CoreSimulator
 class IndigoHIDMessage {
     /// You must NOT change the length to anything other than 0xC0
     public var data: [UInt8] = []
-    
+
     public func as_struct() -> UnsafeMutablePointer<IndigoHIDMessageStruct> {
         //print("data: \(data)")
         // Make sure that the backing data is the correct size
@@ -73,16 +73,16 @@ class IndigoHIDMessage {
         13,
         11,
         51,
-        302,
+        302, // manipulator
         1,
-        300,
-        200,
+        300, // pose
+        200, // digitaldial
         14,
         12,
         60,
-        100,
+        100, // keyboard
         50,
-        301
+        301 // manipulator?
     )'
     *** First throw call stack:
     (
@@ -126,79 +126,69 @@ class IndigoHIDMessage {
         message.write(Int16(0), at: 0x43)
         message.write(Int16(0), at: 0x45)
         
-        /*
-        // (I assume) gaze origin
-        // doesn't actually matter, overridden
-        message.write(pose.l_x, at: 0x47)
-        message.write(pose.l_y - 1.5, at: 0x4B)
-        message.write(pose.l_z, at: 0x4F)
-        message.write(0.0,      at: 0x53)
+        if (pose.grip_val.0 > 0.75 && pose.grip_val.1 > 0.75)
+        {
+            // Gaze fixed to center of vision
+            // (I assume) gaze origin
+            message.write(pose.l_x, at: 0x47)
+            message.write(pose.l_y, at: 0x4B)
+            message.write(pose.l_z, at: 0x4F)
+            message.write(0.0,      at: 0x53)
 
-        // XYZ ray offset from gaze origin
-        // doesn't actually matter, overridden
-        message.write(-pose.l_view.8, at: 0x57) // yaw
-        message.write(-pose.l_view.9, at: 0x5B) // pitch pose.l_ep
-        message.write(-pose.l_view.10, at: 0x5F) // roll pose.l_er
-        message.write(1.0, at: 0x63)
-        */
+            // XYZ ray offset from gaze origin
+            message.write(-pose.l_view.8, at: 0x57) // yaw
+            message.write(-pose.l_view.9, at: 0x5B) // pitch pose.l_ep
+            message.write(-pose.l_view.10, at: 0x5F) // roll pose.l_er
+            message.write(1.0, at: 0x63)
+        }
+        else if (pose.grip_val.1 > 0.75)
+        {
+            // Gaze fixed to right controller
+            // (I assume) gaze origin
+            message.write(pose.r_controller.12, at: 0x47)
+            message.write(pose.r_controller.13, at: 0x4B)
+            message.write(pose.r_controller.14, at: 0x4F)
+            message.write(0.0,      at: 0x53)
 
-        // (I assume) gaze origin
-        // doesn't actually matter, overridden
-        message.write(pose.l_x, at: 0x47)
-        message.write(pose.l_y - 1.5, at: 0x4B)
-        message.write(pose.l_z, at: 0x4F)
-        message.write(0.0,      at: 0x53)
+            // XYZ ray offset from gaze origin
+            message.write(-pose.r_controller.8, at: 0x57) // yaw
+            message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
+            message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
+            message.write(0.0, at: 0x63)
+        }
+        else if (pose.grip_val.0 > 0.75)
+        {
+            // Gaze fixed to left controller
+            // (I assume) gaze origin
+            message.write(pose.l_controller.12, at: 0x47)
+            message.write(pose.l_controller.13, at: 0x4B)
+            message.write(pose.l_controller.14, at: 0x4F)
+            message.write(0.0,      at: 0x53)
 
-        // XYZ ray offset from gaze origin
-        // doesn't actually matter, overridden
-        message.write(pose.gaze_vec.0, at: 0x57) // yaw
-        message.write(pose.gaze_vec.1, at: 0x5B) // pitch pose.l_ep
-        message.write(pose.gaze_vec.2, at: 0x5F) // roll pose.l_er
-        message.write(0.0, at: 0x63)
-        
+            // XYZ ray offset from gaze origin
+            message.write(-pose.l_controller.8, at: 0x57) // yaw
+            message.write(-pose.l_controller.9, at: 0x5B) // pitch pose.l_ep
+            message.write(-pose.l_controller.10, at: 0x5F) // roll pose.l_er
+            message.write(0.0, at: 0x63)
+        }
+        else {
+            // Gaze fixed to eye tracking
+            // (I assume) gaze origin
+            message.write(pose.l_x, at: 0x47)
+            message.write(pose.l_y, at: 0x4B)
+            message.write(pose.l_z, at: 0x4F)
+            message.write(0.0,      at: 0x53)
 
-        // (I assume) gaze origin
-        /*message.write(pose.r_controller.12, at: 0x47)
-        message.write(pose.r_controller.13 - 1.5, at: 0x4B)
-        message.write(pose.r_controller.14, at: 0x4F)
-        message.write(0.0,      at: 0x53)
-
-        // XYZ ray offset from gaze origin
-        message.write(-pose.r_controller.8, at: 0x57) // yaw
-        message.write(-pose.r_controller.9, at: 0x5B) // pitch pose.l_ep
-        message.write(-pose.r_controller.10, at: 0x5F) // roll pose.l_er
-        message.write(0.0, at: 0x63)*/
-        
-        // Left eye
-        /*
-        // Touch ray origin
-        message.write(pose.l_view.12, at: 0x67)
-        message.write(pose.l_view.13 - 1.5,  at: 0x6B)
-        message.write(pose.l_view.14,  at: 0x6F)
-        message.write(pose.l_view.15,   at: 0x73)
-        
-        // Touch ray XYZ end offset from origin
-        message.write(-pose.l_view.8,   at: 0x77)
-        message.write(-pose.l_view.9,   at: 0x7B)
-        message.write(-pose.l_view.10,   at: 0x7F)
-        message.write(pose.l_view.11,   at: 0x83)
-        
-        // Pinch ray origin
-        message.write(pose.l_view.12, at: 0x87)
-        message.write(pose.l_view.13 - 1.5,  at: 0x8B)
-        message.write(pose.l_view.14,  at: 0x8F)
-        message.write(pose.l_view.15,   at: 0x93)
-        
-        // Pinch ray XYZ end offset from origin
-        message.write(-pose.l_view.8,   at: 0x97)
-        message.write(-pose.l_view.9,   at: 0x9B)
-        message.write(-pose.l_view.10,   at: 0x9F)
-        message.write(pose.l_view.11,   at: 0xA3)
-        */
+            // XYZ ray offset from gaze origin
+            message.write(pose.gaze_vec.0, at: 0x57) // yaw
+            message.write(pose.gaze_vec.1, at: 0x5B) // pitch pose.l_ep
+            message.write(pose.gaze_vec.2, at: 0x5F) // roll pose.l_er
+            message.write(0.0, at: 0x63)
+        }
 
         // Touch ray origin
         message.write(pose.l_controller.12, at: 0x67)
-        message.write(pose.l_controller.13 - 1.5,  at: 0x6B)
+        message.write(pose.l_controller.13,  at: 0x6B)
         message.write(pose.l_controller.14,  at: 0x6F)
         message.write(pose.l_controller.15,   at: 0x73)
         
@@ -210,7 +200,7 @@ class IndigoHIDMessage {
         
         // Pinch ray origin
         message.write(pose.r_controller.12, at: 0x87)
-        message.write(pose.r_controller.13 - 1.5,  at: 0x8B)
+        message.write(pose.r_controller.13,  at: 0x8B)
         message.write(pose.r_controller.14,  at: 0x8F)
         message.write(pose.r_controller.15,   at: 0x93)
         
@@ -236,6 +226,56 @@ class IndigoHIDMessage {
         message.write(qy, at: 0x68)
         message.write(qz, at: 0x6C)
         message.write(qw, at: 0x70) // Not sure why, but this is important
+
+        return message
+    }
+
+    public static func digitaldial(_ dial: Double) -> IndigoHIDMessage {
+        let message = IndigoHIDMessage()
+
+        message.write(0x06, at:0x20)
+
+        message.write(0x10, at:0x2C)
+        message.write(0, at:0x34)
+        message.write(0, at:0x38)
+        message.write(dial, at:0x3C)
+        message.write(0, at:0x44)
+        message.write(0, at:0x48)
+        message.write(200, at:0x4C)
+
+        return message
+    }
+
+    public static func digitalcrown(_ val: Double) -> IndigoHIDMessage {
+        let message = IndigoHIDMessage()
+
+        message.write(0x06, at:0x20)
+
+        message.write(0x10, at:0x2C)
+        message.write(0, at:0x34)
+        message.write(0, at:0x38)
+        message.write(val, at:0x3C)
+        message.write(0, at:0x44)
+        message.write(0, at:0x48)
+        message.write(52, at:0x4C)
+
+        return message
+    }
+
+    public static func keyboard(_ val1: Int, _ val2: Int) -> IndigoHIDMessage {
+        let message = IndigoHIDMessage()
+
+        let keyboard_type = my_LMGetKbdType()//IndigoHIDGetKeyboardType();
+        message.write(0x02, at:0x20)
+
+        message.write(10000, at:0x30)
+        message.write(val1, at:0x34) // keycode?
+        message.write(100, at:0x38) // target
+        message.write(val2, at:0x3C) // HIDButtonOp
+        message.write(keyboard_type, at:0x40)
+        message.write(0, at:0x44)
+        message.write(0, at:0x48)
+        message.write(52, at:0x4C)
 
         return message
     }

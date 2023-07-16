@@ -106,7 +106,8 @@ add_library(XRGyroControls
   simui_src/IndigoHID.swift simui_src/SimulatorSupport.swift 
 )
 target_compile_options(XRGyroControls PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator -import-objc-header ${CMAKE_SOURCE_DIR}/simui_src/simui-Bridging-Header.h)
-target_link_libraries(XRGyroControls PRIVATE XRGyroControls_ObjC SimulatorKit /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator)
+target_link_libraries(XRGyroControls PRIVATE XRGyroControls_ObjC SimulatorKit /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator "-framework Carbon")
+#target_link_options(XRGyroControls PRIVATE -Wl,-U,_IndigoHIDGetKeyboardType)
 set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
 #target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${OPENGL_LIBRARIES} ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})

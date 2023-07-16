@@ -398,12 +398,26 @@ Headset::Headset(const Context* context) : context(context)
   xrStringToPath(xrInstance, "/user/hand/right/input/select/click",
                  &select_click_path[HAND_RIGHT_INDEX]);
 
+  xrStringToPath(xrInstance, "/user/hand/left/input/system/click",
+                 &system_click_path[HAND_LEFT_INDEX]);
+  xrStringToPath(xrInstance, "/user/hand/right/input/system/click",
+                 &system_click_path[HAND_RIGHT_INDEX]);
+
+   xrStringToPath(xrInstance, "/user/hand/left/input/menu/click",
+                 &menu_click_path[HAND_LEFT_INDEX]);
+  xrStringToPath(xrInstance, "/user/hand/right/input/menu/click",
+                 &menu_click_path[HAND_RIGHT_INDEX]);
+
   
   xrStringToPath(xrInstance, "/user/hand/left/input/trigger/value",
                  &trigger_value_path[HAND_LEFT_INDEX]);
   xrStringToPath(xrInstance, "/user/hand/right/input/trigger/value",
                  &trigger_value_path[HAND_RIGHT_INDEX]);
 
+  xrStringToPath(xrInstance, "/user/hand/left/input/squeeze/value",
+                 &grip_value_path[HAND_LEFT_INDEX]);
+  xrStringToPath(xrInstance, "/user/hand/right/input/squeeze/value",
+                 &grip_value_path[HAND_RIGHT_INDEX]);
   
   xrStringToPath(xrInstance, "/user/hand/left/input/thumbstick/y",
                  &thumbstick_y_path[HAND_LEFT_INDEX]);
@@ -468,6 +482,34 @@ Headset::Headset(const Context* context) : context(context)
     //  return 1;
   }
 
+  {
+    XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
+                                      .next = NULL,
+                                      .actionType = XR_ACTION_TYPE_FLOAT_INPUT,
+                                      .countSubactionPaths = HAND_COUNT,
+                                      .subactionPaths = hand_paths};
+    strcpy(action_info.actionName, "gripobjectfloat");
+    strcpy(action_info.localizedActionName, "Grip Object");
+
+    result = xrCreateAction(gameplay_actionset, &action_info, &grip_action_float);
+    //if (!XR_SUCCEEDED(result))
+    //  return 1;
+  }
+
+  {
+    XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
+                                      .next = NULL,
+                                      .actionType = XR_ACTION_TYPE_BOOLEAN_INPUT,
+                                      .countSubactionPaths = HAND_COUNT,
+                                      .subactionPaths = hand_paths};
+    strcpy(action_info.actionName, "systemactionbool");
+    strcpy(action_info.localizedActionName, "Home Button");
+
+    result = xrCreateAction(gameplay_actionset, &action_info, &system_action_bool);
+    //if (!XR_SUCCEEDED(result))
+    //  return 1;
+  }
+
   
   {
     XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
@@ -479,36 +521,6 @@ Headset::Headset(const Context* context) : context(context)
     strcpy(action_info.localizedActionName, "Haptic Vibration");
     result = xrCreateAction(gameplay_actionset, &action_info, &haptic_action);
     //if (!XR_SUCCEEDED(result))
-    //  return 1;
-  }
-
-  // suggest actions for simple controller
-  {
-    XrPath interaction_profile_path;
-    result = xrStringToPath(xrInstance, "/interaction_profiles/khr/simple_controller",
-                            &interaction_profile_path);
-    //if (!xr_check(xrInstance, result, "failed to get interaction profile"))
-    //  return 1;
-
-    const XrActionSuggestedBinding bindings[] = {
-        {.action = hand_pose_action, .binding = grip_pose_path[HAND_LEFT_INDEX]},
-        {.action = hand_pose_action, .binding = grip_pose_path[HAND_RIGHT_INDEX]},
-        // boolean input select/click will be converted to float that is either 0 or 1
-        {.action = grab_action_float, .binding = select_click_path[HAND_LEFT_INDEX]},
-        {.action = grab_action_float, .binding = select_click_path[HAND_RIGHT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
-    };
-
-    const XrInteractionProfileSuggestedBinding suggested_bindings = {
-        .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-        .next = NULL,
-        .interactionProfile = interaction_profile_path,
-        .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
-        .suggestedBindings = bindings};
-
-    xrSuggestInteractionProfileBindings(xrInstance, &suggested_bindings);
-    //if (!xr_check(xrInstance, result, "failed to suggest bindings"))
     //  return 1;
   }
 
@@ -525,8 +537,12 @@ Headset::Headset(const Context* context) : context(context)
         {.action = hand_pose_action, .binding = grip_pose_path[HAND_RIGHT_INDEX]},
         {.action = grab_action_float, .binding = trigger_value_path[HAND_LEFT_INDEX]},
         {.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT_INDEX]},
+        {.action = grip_action_float, .binding = grip_value_path[HAND_LEFT_INDEX]},
+        {.action = grip_action_float, .binding = grip_value_path[HAND_RIGHT_INDEX]},
         {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
         {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
+        {.action = system_action_bool, .binding = system_click_path[HAND_LEFT_INDEX]},
+        {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
     };
 
     const XrInteractionProfileSuggestedBinding suggested_bindings = {
@@ -540,6 +556,74 @@ Headset::Headset(const Context* context) : context(context)
     //if (!xr_check(xrInstance, result, "failed to suggest bindings"))
     //  return 1;
   }
+
+  // suggest actions for Oculus Touch-type controllers
+  {
+    XrPath interaction_profile_path;
+    result = xrStringToPath(xrInstance, "/interaction_profiles/oculus/touch_controller",
+                            &interaction_profile_path);
+    //if (!xr_check(xrInstance, result, "failed to get interaction profile"))
+    //  return 1;
+
+    const XrActionSuggestedBinding bindings[] = {
+        {.action = hand_pose_action, .binding = grip_pose_path[HAND_LEFT_INDEX]},
+        {.action = hand_pose_action, .binding = grip_pose_path[HAND_RIGHT_INDEX]},
+        {.action = grab_action_float, .binding = trigger_value_path[HAND_LEFT_INDEX]},
+        {.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT_INDEX]},
+        {.action = grip_action_float, .binding = grip_value_path[HAND_LEFT_INDEX]},
+        {.action = grip_action_float, .binding = grip_value_path[HAND_RIGHT_INDEX]},
+        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
+        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
+        {.action = system_action_bool, .binding = menu_click_path[HAND_LEFT_INDEX]},
+        {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
+    };
+
+    const XrInteractionProfileSuggestedBinding suggested_bindings = {
+        .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+        .next = NULL,
+        .interactionProfile = interaction_profile_path,
+        .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+        .suggestedBindings = bindings};
+
+    xrSuggestInteractionProfileBindings(xrInstance, &suggested_bindings);
+    //if (!xr_check(xrInstance, result, "failed to suggest bindings"))
+    //  return 1;
+  }
+
+
+#if 0
+  // suggest actions for simple controller
+  {
+    XrPath interaction_profile_path;
+    result = xrStringToPath(xrInstance, "/interaction_profiles/khr/simple_controller",
+                            &interaction_profile_path);
+    //if (!xr_check(xrInstance, result, "failed to get interaction profile"))
+    //  return 1;
+
+    const XrActionSuggestedBinding bindings[] = {
+        {.action = hand_pose_action, .binding = grip_pose_path[HAND_LEFT_INDEX]},
+        {.action = hand_pose_action, .binding = grip_pose_path[HAND_RIGHT_INDEX]},
+        // boolean input select/click will be converted to float that is either 0 or 1
+        {.action = grab_action_float, .binding = select_click_path[HAND_LEFT_INDEX]},
+        {.action = grab_action_float, .binding = select_click_path[HAND_RIGHT_INDEX]},
+        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
+        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
+        {.action = system_action_bool, .binding = select_click_path[HAND_LEFT_INDEX]},
+        {.action = system_action_bool, .binding = select_click_path[HAND_RIGHT_INDEX]},
+    };
+
+    const XrInteractionProfileSuggestedBinding suggested_bindings = {
+        .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+        .next = NULL,
+        .interactionProfile = interaction_profile_path,
+        .countSuggestedBindings = sizeof(bindings) / sizeof(bindings[0]),
+        .suggestedBindings = bindings};
+
+    xrSuggestInteractionProfileBindings(xrInstance, &suggested_bindings);
+    //if (!xr_check(xrInstance, result, "failed to suggest bindings"))
+    //  return 1;
+  }
+#endif
 
   XrSessionActionSetsAttachInfo actionset_attach_info = {
       .type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
@@ -777,6 +861,9 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   result = xrSyncActions(session, &actions_sync_info);
   //xr_result(self->instance, result, "failed to sync actions!");
 
+  system_button = false;
+  menu_button = false;
+
   for (int i = 0; i < HAND_COUNT; i++) {
     XrActionStatePose hand_pose_state = {.type = XR_TYPE_ACTION_STATE_POSE, .next = NULL};
     {
@@ -807,6 +894,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
     grab_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
     grab_value[i].next = NULL;
+    grab_value[i].currentState = 0.0;
     {
       XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
                                        .next = NULL,
@@ -814,6 +902,18 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
                                        .subactionPath = hand_paths[i]};
 
       result = xrGetActionStateFloat(session, &get_info, &grab_value[i]);
+      //xr_check(instance, result, "failed to get grab value!");
+    }
+
+    grip_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
+    grip_value[i].next = NULL;
+    {
+      XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                       .next = NULL,
+                                       .action = grip_action_float,
+                                       .subactionPath = hand_paths[i]};
+
+      result = xrGetActionStateFloat(session, &get_info, &grip_value[i]);
       //xr_check(instance, result, "failed to get grab value!");
     }
 
@@ -836,6 +936,27 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
                                      (const XrHapticBaseHeader*)&vibration);
       //xr_check(instance, result, "failed to apply haptic feedback!");
       // printf("Sent haptic output to hand %d\n", i);
+    }
+
+    system_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
+    system_value[i].next = NULL;
+    {
+      XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                       .next = NULL,
+                                       .action = system_action_bool,
+                                       .subactionPath = hand_paths[i]};
+
+      
+      result = xrGetActionStateBoolean(session, &get_info, &system_value[i]);
+      //xr_check(instance, result, "failed to get grab value!");
+
+      //printf("system %u, %x\n", i, system_value[i].currentState);
+      if (system_value[i].currentState && i == HAND_LEFT_INDEX) {
+        menu_button = true;
+      }
+      else if (system_value[i].currentState && i == HAND_RIGHT_INDEX) {
+        system_button = true;
+      }
     }
   };
 

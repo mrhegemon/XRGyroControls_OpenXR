@@ -1,6 +1,7 @@
 @import Darwin;
 @import ObjectiveC;
 @import UniformTypeIdentifiers;
+#import <Carbon/Carbon.h>
 
 #include "simui_types.h"
 
@@ -63,4 +64,32 @@ OBJC_EXPORT sharedmem_data* ObjCBridge_Loop()
     sharedmem_data* ret = (sharedmem_data*)shm_addr;
     //printf("%f %f %f\n", ret->l_x, ret->l_y, ret->l_z);
     return ret;
+}
+
+OBJC_EXPORT void ObjCBridge_HomeButtonPress()
+{
+    CGEventRef ref = CGEventCreateKeyboardEvent(NULL, 0x4 /* H */, 1);
+    CGEventSetFlags( ref, kCGEventFlagMaskCommand | kCGEventFlagMaskShift  );
+    CGEventPost(kCGHIDEventTap, ref);
+    
+    // Doesn't work...
+    /*ProcessSerialNumber psn;
+    psn.highLongOfPSN = 0;
+    psn.lowLongOfPSN = kCurrentProcess;
+    CGEventPostToPSN(&psn, ref);*/
+
+
+    CFRelease(ref);
+}
+
+OBJC_EXPORT void ObjCBridge_HomeButtonPressUp()
+{
+    CGEventRef ref = CGEventCreateKeyboardEvent(NULL, 0x4 /* H */, 0);
+    CGEventSetFlags( ref, kCGEventFlagMaskCommand | kCGEventFlagMaskShift );
+    CGEventPost(kCGHIDEventTap, ref);
+    CFRelease(ref);
+}
+
+OBJC_EXPORT int my_LMGetKbdType() {
+    return LMGetKbdType();
 }
