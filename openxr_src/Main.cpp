@@ -539,6 +539,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
 
     glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
 
+#if 0
     float filter_alpha = 0.15;
     float filter_alpha_iter = (1.0 - filter_alpha);
     glm::vec3 z_vec_filtered = z_vec * filter_alpha;
@@ -562,10 +563,11 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
     }
 
     z_vec_filtered = glm::normalize(z_vec_filtered);
+#endif
 
-    memcpy(dat->gaze_vec, glm::value_ptr(z_vec_filtered), sizeof(dat->gaze_vec));
+    memcpy(dat->gaze_vec, glm::value_ptr(z_vec), sizeof(dat->gaze_vec));
 
-    printf("Left:  %f %f %f %f\n", z_vec_filtered[0], z_vec_filtered[1], z_vec_filtered[2]);
+    //printf("Left:  %f %f %f %f\n", z_vec_filtered[0], z_vec_filtered[1], z_vec_filtered[2]);
   }
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
