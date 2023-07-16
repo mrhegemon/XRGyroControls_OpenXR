@@ -70,6 +70,10 @@ function fixup_dependency ()
     install_name_tool -change /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics /System/Library/Frameworks/CoreGraphics.framework/CoreGraphics $vtool_dst
     install_name_tool -change /System/Library/Frameworks/Foundation.framework/Versions/C/Foundation /System/Library/Frameworks/Foundation.framework/Foundation $vtool_dst
     install_name_tool -change /System/Library/PrivateFrameworks/SoftLinking.framework/Versions/A/SoftLinking /System/Library/PrivateFrameworks/SoftLinking.framework/SoftLinking $vtool_dst
+    install_name_tool -change /System/Library/Frameworks/VideoToolbox.framework/Versions/A/VideoToolbox /System/Library/Frameworks/VideoToolbox.framework/VideoToolbox $vtool_dst
+    install_name_tool -change /System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices /System/Library/Frameworks/CoreServices.framework/CoreServices $vtool_dst
+    install_name_tool -change /System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia /System/Library/Frameworks/CoreMedia.framework/CoreMedia $vtool_dst
+    install_name_tool -change /System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo /System/Library/Frameworks/CoreVideo.framework/CoreVideo $vtool_dst
 
     codesign -s - $vtool_dst --force --deep --verbose
 }
