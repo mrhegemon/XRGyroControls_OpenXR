@@ -9,6 +9,10 @@ PWD=$(pwd)
 # These env vars can interfere w/ building
 unset MACOSX_DEPLOYMENT_TARGET
 
+if [[ -z "${XCODE_BETA_PATH}" ]]; then
+    export XCODE_BETA_PATH="/Applications/Xcode-beta.app"
+fi
+
 if ! [[ -d "libusb" ]]; then
     mkdir -p libusb
     pushd libusb
@@ -46,7 +50,7 @@ glslc --target-env=vulkan1.2 $PWD/shaders/Rect.frag -std=450core -O -o $PWD/shad
 cp build/libSim2OpenXR.dylib libSim2OpenXR.dylib
 
 # Remove old sim stuff
-rm -rf /Applications/Xcode-beta.app/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
+rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
 
 # otool -L is your friend, make sure there's nothing weird
 function fixup_dependency ()
@@ -148,5 +152,5 @@ cp build/libXRGyroControls.dylib XRGyroControls.simdeviceui/Contents/MacOS/XRGyr
 codesign -s - XRGyroControls.simdeviceui --force --deep --verbose
 
 # Copy to CoreSimulator
-rm -rf /Applications/Xcode-beta.app/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
-cp -r XRGyroControls.simdeviceui /Applications/Xcode-beta.app/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
+rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
+cp -r XRGyroControls.simdeviceui ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
