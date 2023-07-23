@@ -16,12 +16,6 @@
       (const void*)(unsigned long)&_replacement, (const void*)(unsigned long)&_replacee}
 
 // 6.5cm translation on x
-static simd_float4x4 gRightEyeMatrix = {.columns = {
-                                            {1, 0, 0, 0},
-                                            {0, 1, 0, 0},
-                                            {0, 0, 1, 0},
-                                            {0.065, 0, 0, 1},
-                                        }};
 static simd_float4x4 gIdentityMat = {.columns = {
                                             {1, 0, 0, 0},
                                             {0, 1, 0, 0},
@@ -33,13 +27,6 @@ static simd_float4x4 gWorldMat = {.columns = {
                                             {0, 1, 0, 0},
                                             {0, 0, 1, 0},
                                             {0, 2.0, 0, 1},
-                                        }};
-
-static simd_float4x4 gNewWorldMat = {.columns = {
-                                            {1, 0, 0, 0},
-                                            {0, 1, 0, 0},
-                                            {0, 0, 1, 0},
-                                            {0, 0.0, 0, 1},
                                         }};
 
 static simd_float4x4 left_controller_pose;
@@ -64,14 +51,6 @@ struct cp_view {
 };
 static_assert(sizeof(struct cp_view) == 0x110, "cp_view size is wrong");
 
-struct ar_pose_internal {
-  uint32_t unk_0[4]; // NSObject
-  simd_float4x4 transform; // 0x10
-  simd_float4x4 transform_2; // 0x50
-};
-static_assert(sizeof(struct ar_pose_internal) == 0x90, "OS_ar_pose size is wrong");
-typedef struct ar_pose_internal* ar_pose_internal_t;
-
 // cp_view_texture_map_get_texture_index
 struct cp_view_texture_map {
   size_t texture_index;  // 0x0
@@ -84,13 +63,6 @@ struct RSSimulatedHeadsetPose {
   simd_float4 rotation;
 };
 
-static const int kTakeScreenshotStatusIdle = 0;
-static const int kTakeScreenshotStatusScreenshotNextFrame = 1;
-static const int kTakeScreenshotStatusScreenshotInProgress = 2;
-
-// TODO(zhuowei): do I need locking for this?
-static int gTakeScreenshotStatus = kTakeScreenshotStatusIdle;
-
 // TODO(zhuowei): multiple screenshots in flight
 static cp_drawable_t gHookedDrawable;
 
@@ -99,18 +71,9 @@ static id<MTLTexture> gHookedRightDepthTexture = nil;
 static id<MTLTexture> gHookedLeftTexture = nil;
 static id<MTLTexture> gHookedLeftDepthTexture = nil;
 
-id<MTLTexture> gHookedSimulatorPreviewTexture = nil;
+static id<MTLTexture> gHookedSimulatorPreviewTexture = nil;
 
-// NOT working
-//#define SEPARATE_LEFT_EYE
-
-#ifdef SEPARATE_LEFT_EYE
-#define NUM_VIEWS (3)
-#else
 #define NUM_VIEWS (2)
-#endif
-
-static void DumpScreenshot(void);
 
 void cp_drawable_set_pose(cp_drawable_t,simd_float4x4);
 void cp_drawable_set_simd_pose(cp_drawable_t,simd_float4x4);
@@ -166,11 +129,11 @@ DYLD_INTERPOSE(hook__os_feature_enabled_impl, _os_feature_enabled_impl);
 void RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a);
 static void hook_RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a)
 {
-  //printf("asdf\n");
   gWorldMat = a;
   //RETransformComponentSetWorldMatrix4x4F(gIdentityMat);
   RETransformComponentSetWorldMatrix4x4F(a);
 }
+DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
 
 static cp_time_t hook_cp_frame_timing_get_presentation_time(void* a)
 {
@@ -188,17 +151,6 @@ static cp_time_t hook_cp_frame_timing_get_rendering_deadline(void* a)
   return cp_frame_timing_get_rendering_deadline(a);
 }
 DYLD_INTERPOSE(hook_cp_frame_timing_get_rendering_deadline, cp_frame_timing_get_rendering_deadline);
-
-void RCPAnchorDefinitionComponentInitWithHand(void* a, void* b, void* c);
-
-void hook_RCPAnchorDefinitionComponentInitWithHand(void* a, void* b, void* c)
-{
-  printf("aaaaaaaasdf\n");
-  RCPAnchorDefinitionComponentInitWithHand(a, b, c);
-}
-
-DYLD_INTERPOSE(hook_RCPAnchorDefinitionComponentInitWithHand, RCPAnchorDefinitionComponentInitWithHand);
-DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
 
 #if 0
 void RERenderManagerWaitForFramePacing(void* ctx);
@@ -222,78 +174,24 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     gHookedLeftTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
     gHookedLeftDepthTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
   }
-  //if (gTakeScreenshotStatus == kTakeScreenshotStatusScreenshotNextFrame) 
-  {
-    gTakeScreenshotStatus = kTakeScreenshotStatusScreenshotInProgress;
-    gHookedDrawable = retval;
-    gHookedSimulatorPreviewTexture = cp_drawable_get_color_texture(retval, 0);
-    //NSLog(@"visionos_stereo_screenshots starting screenshot!");
-  }
-  ar_pose_internal_t pose = (__bridge ar_pose_internal_t)cp_drawable_get_ar_pose(retval);
+
+  gHookedDrawable = retval;
+  gHookedSimulatorPreviewTexture = cp_drawable_get_color_texture(retval, 0);
+
   cp_view_t simView = cp_drawable_get_view(retval, 0);
   cp_view_t rightView = cp_drawable_get_view(retval, 1);
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  cp_view_t leftView = cp_drawable_get_view(retval, 2);
-#endif
   memcpy(rightView, simView, sizeof(*simView));
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  memcpy(leftView, simView, sizeof(*simView));
-#endif
 
-  static int every_other = 0;
-  every_other++;
-
-#if 0
-  if (every_other & 1) 
-  {
-    cp_view_get_view_texture_map(simView)->texture_index = 0;
-    cp_view_get_view_texture_map(rightView)->texture_index = 0;
-  }
-  else 
-  {
-    cp_view_get_view_texture_map(simView)->texture_index = 2;
-    cp_view_get_view_texture_map(rightView)->texture_index = 1;
-  }
-  //cp_view_get_view_texture_map(rightView)->texture_index = 1;
-#endif
-
-#if 0
-  static int really_slow_preview = 0;
-
-  if (really_slow_preview > 120) {
-    cp_view_get_view_texture_map(simView)->texture_index = 0;
-    really_slow_preview = 0;
-  }
-  else if (really_slow_preview > 119) {
-    cp_view_get_view_texture_map(simView)->texture_index = 0;
-  }
-  else 
-#endif
-  {
-    cp_view_get_view_texture_map(rightView)->texture_index = 1;
-    cp_view_get_view_texture_map(simView)->texture_index = 2; // HACK: move the sim view to the left eye texture index
-  }
-  //really_slow_preview++;
-  
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  cp_view_get_view_texture_map(leftView)->texture_index = 2;
-#endif
+  cp_view_get_view_texture_map(rightView)->texture_index = 1;
+  cp_view_get_view_texture_map(simView)->texture_index = 2; // HACK: move the sim view to the left eye texture index
 
   openxr_set_textures(gHookedLeftTexture, gHookedRightTexture, gHookedRightTexture.width, gHookedRightTexture.height);
-  //openxr_set_textures(gHookedSimulatorPreviewTexture, gHookedRightTexture, gHookedRightTexture.width, gHookedRightTexture.height);
-  //openxr_pre_loop();
 
   openxr_spawn_renderframe();
 
   // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
   openxr_headset_data xr_data;
   openxr_headset_get_data(&xr_data);
-
-  //*(int*)(0x1234567) = 0x1234;
-  //assert(0);
-
-  //2732x2048
-  //printf("Framebuffer is %ux%u\n", gHookedLeftTexture.width, gHookedLeftTexture.height);
 
   // Apple
   // X is -left/+right
@@ -319,11 +217,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   right_eye_quat[2] = xr_data.r_qz;
   right_eye_quat[3] = xr_data.r_qw;
 
-  /*rightView->transform.columns[3][0] = xr_data.r_x;
-  rightView->transform.columns[3][1] = xr_data.r_y;
-  rightView->transform.columns[3][2] = xr_data.r_z * 2.0;
-  rightView->transform.columns[3][3] = 0.0;*/
-
   simd_float4x4 view_mat_l;
   simd_float4x4 view_mat_r;
 
@@ -333,13 +226,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     {
       for (int j = 0; j < 4; j++)
       {
-        //printf("%u,%u: %f\n", i,j, pose->transform.columns[i][j]);
-        //pose->transform.columns[i][j] = xr_data.view_l[(i*4)+j];
         view_mat_l.columns[i][j] = xr_data.view_l[(i*4)+j];
-        //leftView->transform.columns[i][j] = xr_data.view_l[(i*4)+j];
-        /*if (j == 2) {
-          leftView->transform.columns[i][j] *= -1.0;
-        }*/
       }
     }
   }
@@ -351,9 +238,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
       for (int j = 0; j < 4; j++)
       {
         view_mat_r.columns[i][j] = xr_data.view_r_rel[(i*4)+j];
-        /*if (j == 2) {
-          rightView->transform.columns[i][j] *= -1.0;
-        }*/
       }
     }
   }
@@ -368,77 +252,8 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   }
 
   simView->height_maybe = 0.0f;
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  leftView->height_maybe = 0.0f;
-#endif
   rightView->height_maybe = 0.0f;
 
-  //gWorldMat = view_mat_l;
-  //gWorldMat.columns[3][1] += 0.0;
-  gRightEyeMatrix.columns[3][0] = view_mat_r.columns[3][0] - view_mat_l.columns[3][0];
-  //gRightEyeMatrix.columns[3][1] = view_mat_r.columns[3][1] - view_mat_l.columns[3][1];
-  //gRightEyeMatrix.columns[3][2] = view_mat_r.columns[3][2] - view_mat_l.columns[3][2];
-  //leftView->transform.columns[3][1] += 2.0;
-  //rightView->transform.columns[3][1] += 2.0;
-
-
-  /*gWorldMat.columns[3][0] = view_mat_l.columns[3][0];
-  gWorldMat.columns[3][1] = view_mat_l.columns[3][1] - 1.5;
-  gWorldMat.columns[3][2] = view_mat_l.columns[3][2];*/
-  
-  /*view_mat_r.columns[3][0] -= view_mat_l.columns[3][0];
-  view_mat_r.columns[3][1] -= view_mat_l.columns[3][1];
-  view_mat_r.columns[3][2] -= view_mat_l.columns[3][2];
-  view_mat_l.columns[3][0] = 0.0;
-  view_mat_l.columns[3][1] = 0.0;
-  view_mat_l.columns[3][2] = 0.0;*/
-
-  // idk
-  //view_mat_l.columns[3][1] -= 1.5f;
-  //view_mat_r.columns[3][1] -= 1.5f;
-  //left_controller_pose.columns[3][1] -= 1.5f;
-  //right_controller_pose.columns[3][1] -= 1.5f;
-  
-  for (int i = 0; i < 0x20; i += 4)
-  {
-    //printf("%x: %x %x %x %x\n", i, leftView->unknown[i+0], leftView->unknown[i+1], leftView->unknown[i+2], leftView->unknown[i+3]);
-  }
-  
-  
-
-  //float fovAngleHorizontal = 108 * M_PI / 180;
-  //float fovAngleVertical = CalculateFovY(fovAngleHorizontal, 2732 / 2048.f);
-
-  /*
-  leftLens = (
-        angleUp = 42,
-        angleDown = 54,
-        angleLeft = 54,
-        angleRight = 40,
-        info8Unk3p0 = -0.0246586,
-        info8Unk3p1 = -0,
-        info8Unk4p0 = 0.0234743,
-        info8Unk4p1 = -0.0030586,
-        info8Unk5p0 = 0,
-        info8Unk5p1 = 0.0234743,
-        info8Unk6p0 = 0.0432,
-        info8Unk6p1 = 0.04608 ),
-      rightLens = (
-        angleUp = 42,
-        angleDown = 54,
-        angleLeft = 40,
-        angleRight = 54,
-  */
-
-  /*float fovAngleLeft_l = -fovAngleHorizontal / 2;
-  float fovAngleRight_l = fovAngleHorizontal / 2;
-  float fovAngleTop_l = fovAngleVertical / 2;
-  float fovAngleBottom_l = -fovAngleVertical / 2;
-
-  float fovAngleLeft_r = -fovAngleHorizontal / 2;
-  float fovAngleRight_r = fovAngleHorizontal / 2;
-  float fovAngleTop_r = fovAngleVertical / 2;
-  float fovAngleBottom_r = -fovAngleVertical / 2;*/
 
   float fovAngleLeft_l   = -42 * M_PI / 180;
   float fovAngleRight_l  =  40 * M_PI / 180;
@@ -457,9 +272,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
                                           tanf(fovAngleTop_r), tanf(-fovAngleBottom_r));
 
   simView->tangents = tangents_l;
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  leftView->tangents = tangents_l;
-#endif
   rightView->tangents = tangents_r;
 
   if (xr_data.tangents_l)
@@ -467,9 +279,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     simd_float4 tangents_l = simd_make_float4(tanf(-xr_data.tangents_l[0]), tanf(xr_data.tangents_l[1]),
                                               tanf(xr_data.tangents_l[2]), tanf(-xr_data.tangents_l[3]));
     simView->tangents = tangents_l;
-#ifdef SEPARATE_LEFT_EYE_VIEW
-    leftView->tangents = tangents_l;
-#endif
   }
   
   if (xr_data.tangents_r)
@@ -479,35 +288,9 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     rightView->tangents = tangents_r;
   }
 
-  //gNewWorldMat = gIdentityMat;
-  /*gNewWorldMat.columns[3][0] = view_mat_l.columns[3][0];
-  gNewWorldMat.columns[3][1] = view_mat_l.columns[3][1];
-  gNewWorldMat.columns[3][2] = view_mat_l.columns[3][2];
-  gNewWorldMat.columns[3][3] = view_mat_l.columns[3][3];
-
-  view_mat_r.columns[3][0] -= view_mat_l.columns[3][0];
-  view_mat_r.columns[3][1] -= view_mat_l.columns[3][1];
-  view_mat_r.columns[3][2] -= view_mat_l.columns[3][2];
-  view_mat_r.columns[3][3] -= view_mat_l.columns[3][3];
-
-  view_mat_l.columns[3][0] = 0.0;
-  view_mat_l.columns[3][1] = 0.0;
-  view_mat_l.columns[3][2] = 0.0;
-  view_mat_l.columns[3][3] = 0.0;*/
-
-  gRightEyeMatrix.columns[3][0] = view_mat_r.columns[3][0] - view_mat_l.columns[3][0];
-  gRightEyeMatrix.columns[3][1] = view_mat_r.columns[3][1] - view_mat_l.columns[3][1];
-  gRightEyeMatrix.columns[3][2] = view_mat_r.columns[3][2] - view_mat_l.columns[3][2];
-  gRightEyeMatrix.columns[3][3] = view_mat_r.columns[3][3] - view_mat_l.columns[3][3];
-
-  simView->transform = view_mat_l;
-#ifdef SEPARATE_LEFT_EYE_VIEW
-  leftView->transform = view_mat_l;
-#endif
-  gNewWorldMat = view_mat_l;
+  //simView->transform = view_mat_l;
   rightView->transform = view_mat_r;
   simView->transform = gIdentityMat;
-  //rightView->transform = gRightEyeMatrix;
 
   left_eye_zbasis[0] = view_mat_l.columns[2][0];
   left_eye_zbasis[1] = view_mat_l.columns[2][1];
@@ -523,9 +306,6 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
   if (gHookedDrawable == drawable) {
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      //DumpScreenshot();
-      //openxr_loop();
-      //openxr_spawn_renderframe();
       openxr_complete_renderframe();
     }];
   }
@@ -535,15 +315,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
   [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture];
   [blit endEncoding];
 
-  //openxr_complete_renderframe();
-
-  //NSLog(@"visionos_stereo_screenshot: present");
-  if (gHookedDrawable == drawable) {
-    //openxr_spawn_renderframe();
-  }
-
   cp_drawable_encode_present(drawable, command_buffer);
-  //openxr_loop();
 }
 
 DYLD_INTERPOSE(hook_cp_drawable_encode_present, cp_drawable_encode_present);
@@ -600,37 +372,10 @@ void hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__()
 //DYLD_INTERPOSE(hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__, __WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__);
 #endif
 
-void cp_drawable_present(cp_drawable_t drawable);
-static void hook_cp_drawable_present(cp_drawable_t drawable) {
-  /*if (gHookedDrawable == drawable) {
-    [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      //DumpScreenshot();
-    }];
-  }*/
-
-  //NSLog(@"visionos_stereo_screenshot: present");
-  //openxr_loop();
-
-  cp_drawable_present(drawable);
-}
-
-DYLD_INTERPOSE(hook_cp_drawable_present, cp_drawable_present);
-
-#if 0
-int RSIsRunningOnSimulator();
-static int hook_RSIsRunningOnSimulator()
-{
-  return 1;
-}
-DYLD_INTERPOSE(hook_RSIsRunningOnSimulator, RSIsRunningOnSimulator);
-#endif
-
 static size_t hook_cp_drawable_get_view_count(cp_drawable_t drawable) { return NUM_VIEWS; }
-
 DYLD_INTERPOSE(hook_cp_drawable_get_view_count, cp_drawable_get_view_count);
 
 static size_t hook_cp_drawable_get_texture_count(cp_drawable_t drawable) { return NUM_VIEWS+1; }
-
 DYLD_INTERPOSE(hook_cp_drawable_get_texture_count, cp_drawable_get_texture_count);
 
 static id<MTLTexture> hook_cp_drawable_get_color_texture(cp_drawable_t drawable, size_t index) {
@@ -698,79 +443,6 @@ static void hook_RERenderFrameSettingsSetTotalTime(void* re, float time) {
 
 DYLD_INTERPOSE(hook_RERenderFrameSettingsSetTotalTime, RERenderFrameSettingsSetTotalTime);
 #endif
-
-static void DumpScreenshot() {
-  NSLog(@"visionos_stereo_screenshot: DumpScreenshot");
-  gTakeScreenshotStatus = kTakeScreenshotStatusIdle;
-
-  size_t textureDataSize = gHookedRightTexture.width * gHookedRightTexture.height * 4;
-  NSMutableData* outputData = [NSMutableData dataWithLength:textureDataSize];
-  [gHookedSimulatorPreviewTexture
-           getBytes:outputData.mutableBytes
-        bytesPerRow:gHookedSimulatorPreviewTexture.width * 4
-      bytesPerImage:textureDataSize
-         fromRegion:MTLRegionMake2D(0, 0, gHookedSimulatorPreviewTexture.width, gHookedSimulatorPreviewTexture.height)
-        mipmapLevel:0
-              slice:0];
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-  CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)outputData);
-  CGImageRef cgImage = CGImageCreate(
-      gHookedSimulatorPreviewTexture.width, gHookedSimulatorPreviewTexture.height, /*bitsPerComponent=*/8,
-      /*bitsPerPixel=*/32, /*bytesPerRow=*/gHookedSimulatorPreviewTexture.width * 4, colorSpace,
-      kCGImageByteOrder32Little | kCGImageAlphaPremultipliedFirst, provider, /*decode=*/nil,
-      /*shouldInterpolate=*/false, /*intent=*/kCGRenderingIntentDefault);
-
-  NSMutableData* outputData2 = [NSMutableData dataWithLength:textureDataSize];
-  [gHookedRightTexture
-           getBytes:outputData2.mutableBytes
-        bytesPerRow:gHookedRightTexture.width * 4
-      bytesPerImage:textureDataSize
-         fromRegion:MTLRegionMake2D(0, 0, gHookedRightTexture.width, gHookedRightTexture.height)
-        mipmapLevel:0
-              slice:0];
-  CGDataProviderRef provider2 = CGDataProviderCreateWithCFData((__bridge CFDataRef)outputData2);
-  CGImageRef cgImage2 = CGImageCreate(
-      gHookedRightTexture.width, gHookedRightTexture.height, /*bitsPerComponent=*/8,
-      /*bitsPerPixel=*/32, /*bytesPerRow=*/gHookedRightTexture.width * 4, colorSpace,
-      kCGImageByteOrder32Little | kCGImageAlphaPremultipliedFirst, provider2, /*decode=*/nil,
-      /*shouldInterpolate=*/false, /*intent=*/kCGRenderingIntentDefault);
-
-  CGContextRef cgContext = CGBitmapContextCreate(
-      nil, gHookedRightTexture.width * 2, gHookedRightTexture.height, /*bitsPerComponent=*/8,
-      /*bytesPerRow=*/0, colorSpace, kCGImageByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-  CGContextDrawImage(
-      cgContext, CGRectMake(0, 0, gHookedSimulatorPreviewTexture.width, gHookedSimulatorPreviewTexture.height), cgImage);
-  CGContextDrawImage(cgContext,
-                     CGRectMake(gHookedSimulatorPreviewTexture.width, 0, gHookedRightTexture.width,
-                                gHookedRightTexture.height),
-                     cgImage2);
-  CGImageRef outputImage = CGBitmapContextCreateImage(cgContext);
-
-  NSString* filePath =
-      [NSString stringWithFormat:@"/tmp/visionos_stereo_screenshot_%ld.png", time(nil)];
-  ;
-
-  CGImageDestinationRef destination =
-      CGImageDestinationCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:filePath],
-                                      (__bridge CFStringRef)UTTypePNG.identifier, 1, nil);
-  CGImageDestinationAddImage(destination, outputImage, nil);
-  bool success = CGImageDestinationFinalize(destination);
-
-  if (success) {
-    NSLog(@"visionos_stereo_screenshots wrote screenshot to %@", filePath);
-  } else {
-    NSLog(@"visionos_stereo_screenshots failed to write screenshot to %@", filePath);
-  }
-
-  CFRelease(destination);
-  CFRelease(outputImage);
-  CFRelease(cgContext);
-  CFRelease(cgImage);
-  CFRelease(cgImage2);
-  CFRelease(colorSpace);
-  CFRelease(provider);
-  CFRelease(provider2);
-}
 
 //RSXRRenderLoop::currentFrequency
 
@@ -873,10 +545,7 @@ __attribute__((constructor)) static void SetupSignalHandler() {
   signal_source =
       dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, SIGUSR1, /*mask=*/0, signal_queue);
   dispatch_source_set_event_handler(signal_source, ^{
-    if (gTakeScreenshotStatus == kTakeScreenshotStatusIdle) {
-      gTakeScreenshotStatus = kTakeScreenshotStatusScreenshotNextFrame;
-      NSLog(@"visionos_stereo_screenshots preparing to take screenshot!");
-    }
+    // TODO reuse this?
   });
   signal(SIGUSR1, SIG_IGN);
   dispatch_activate(signal_source);

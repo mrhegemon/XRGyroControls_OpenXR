@@ -1,10 +1,13 @@
 #!/bin/bash
 PWD=$(pwd)
 
+
+xcrun simctl spawn booted defaults write com.apple.RealitySystemSupport EnableReclinedMode 1
+xcrun simctl spawn booted defaults write com.apple.RealityEnvironment activeSyntheticEnvironment MuseumDay #KitchenDay    KitchenNight    LivingRoomDay   LivingRoomNight MuseumDay   MuseumNight
 #xcrun simctl spawn booted defaults delete com.apple.RealitySimulation AllowImmersiveVirtualHands
 
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation AllowImmersiveVirtualHands 1
-#xcrun simctl spawn booted defaults write com.apple.RealitySimulation ShowCursor 1
+xcrun simctl spawn booted defaults write com.apple.RealitySimulation ShowCursor 1
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation VirtualDisplayRefreshRate 10
 #xcrun simctl spawn booted defaults write com.apple.RealitySimulation isVRREnabled 0
 #xcrun simctl spawn booted defaults delete com.apple.RealitySimulation SimulatedHeadset
