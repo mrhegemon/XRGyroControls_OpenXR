@@ -5,6 +5,12 @@ if [[ -z "${XCODE_BETA_PATH}" ]]; then
     export XCODE_BETA_PATH="/Applications/Xcode-beta.app"
 fi
 
+if ! [ -x "$(command -v gsed)" ]; then
+  echo 'Error: gsed is not installed.' >&2
+  exit 1
+fi
+
+
 # Remove old sim stuff
 rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
 

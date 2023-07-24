@@ -4,6 +4,7 @@
 
 - Disable SIP
 - Disable library validation (`sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist DisableLibraryValidation -bool true`)
+ - Install brew dependencies: `brew install gsed`
 - You must have Xcode 15 Beta 2 installed to `/Applications`, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 app bundle (eg, `export XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
 - Extract [binary release zip](https://github.com/shinyquagsire23/XRGyroControls_OpenXR/releases) any folder
 - Using terminal, navigate to the extracted folder.
