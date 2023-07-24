@@ -1,5 +1,26 @@
 # XRGyroControls_OpenXR
 
+## Binary Release Instructions
+
+- You must have Xcode 15 Beta 2 installed to /Applications, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 app bundle (eg, `XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
+- Extract [binary release zip](https://github.com/shinyquagsire23/XRGyroControls_OpenXR/releases) any folder
+- Using terminal, navigate to the extracted folder.
+- Run `./install.sh`. This will sign all files for your machine, and adjust loading paths for the current folder. This only needs to be done once, but doing it multiple times will not cause any issues.
+- Run `./run.sh`. This will start the simulator, and the UI should now be absent.
+- Run `./inject.sh`. This will inject into the compositor.
+
+By default, Monado's simulated headset will run in the simulator. This headset gyrates its position slightly. To use Quest Link, plug in your headset, and run `./inject.sh`. The simulator will show the Apple logo until the headset enters Quest Link.
+
+## Known Issues
+
+- ~~Quest Link sometimes does not receive AADT information, and the view will look distorted. Run `./build_run.sh` to reset the simulator and then try again.~~ Fixed with latest monado patches.
+- The Quest Link video stream sometimes becomes juddery after sleeping the headset.
+- The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
+- The visionOS simulator window **must** be focused in order to use the Home button on controllers.
+
+## Accessing the old vision sim UI again
+- `rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui`
+
 ## Building Instructions
 
 Before running anything in this repository, you will want to follow the instructions at https://gist.github.com/shinyquagsire23/3c68aecd872cc7ac21c28e950245dbd2 for setting up a *normal* Quest Link on macOS environment. This includes stuff like setting up MoltenVK.
@@ -25,13 +46,3 @@ Once all the prerequisites are done, run `./build.sh`.
 ## Running
 
 Run `build_run.sh` to reset and then inject into the visionOS simulator. Run `build_inject.sh` to just inject into an existing instance.
-
-## Known Issues
-
-- ~~Quest Link sometimes does not receive AADT information, and the view will look distorted. Run `./build_run.sh` to reset the simulator and then try again.~~ Fixed with latest monado patches.
-- The Quest Link video stream sometimes becomes juddery after sleeping the headset.
-- The gaze ray gets stuck on the left controller when it disconnects
-- The visionOS simulator window must be focused in order to use the Home button on controllers.
-
-## Accessing the old vision sim UI again
-- `rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui`

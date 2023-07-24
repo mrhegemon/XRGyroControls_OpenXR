@@ -47,6 +47,10 @@ fi
 mkdir -p shaders && cp openxr_src/shaders/* shaders/ && cd $PWD && \
 glslc --target-env=vulkan1.2 $PWD/shaders/Basic.vert -std=450core -O -o $PWD/shaders/Basic.vert.spv && \
 glslc --target-env=vulkan1.2 $PWD/shaders/Rect.frag -std=450core -O -o $PWD/shaders/Rect.frag.spv
+retVal=$?
+if [ $retVal -ne 0 ]; then
+    exit $retVal
+fi
 
 cp build/libSim2OpenXR.dylib libSim2OpenXR.dylib
 
@@ -86,7 +90,7 @@ function fixup_dependency ()
     $VTOOL -remove-build-version macos -output $vtool_dst $vtool_dst
     $VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
     $INSTALL_NAME_TOOL -change @rpath/$vtool_dst $(pwd)/$vtool_dst $which_dylib
-    $INSTALL_NAME_TOOL -change $vtool_src $(pwd)/$vtool_dst $which_dylib
+    $INSTALL_NAME_TOOL -change $vtool_src @rpath/$vtool_dst $which_dylib
 
     codesign -s - $vtool_dst --force --deep --verbose
 }
@@ -115,34 +119,16 @@ fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/jpeg-turbo/lib/libjpeg
 $VTOOL -remove-build-version macos -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
 $VTOOL -remove-build-version ios -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
 $VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
-codesign -s - IOUSBLib_ios_hax.dylib --force --deep --verbose
 
 # Fixup libusb bc we don't actually use the homebrew one
 $VTOOL -remove-build-version macos -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
 $VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
-codesign -s - libusb-1.0.0.dylib --force --deep --verbose
-
-#$VTOOL -remove-build-version ios -output  IOUSBLib_ios_macos.dylib IOUSBLib_ios_macos.dylib
-#$VTOOL -set-build-version macos 14.0 14.0 -tool ld 902.8 -output IOUSBLib_ios_macos.dylib IOUSBLib_ios_macos.dylib
-#codesign -s - IOUSBLib_ios_macos.dylib --force --deep --verbose
 
 cp libMoltenVK_iossim.dylib libMoltenVK.dylib
 fixup_dependency libMoltenVK.dylib libMoltenVK.dylib
-#vtool_src=libvulkan.1.dylib
-#vtool_dst=libvulkan.1.dylib
-#$VTOOL -remove-build-version macos -output $vtool_dst $vtool_src
-#$VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
-
-# Sign everything just in case (it complains anyway)
-codesign -s - libopenxr_loader.dylib --force --deep --verbose
-codesign -s - libopenxr_monado.dylib --force --deep --verbose
-codesign -s - libvulkan.1.dylib --force --deep --verbose
-codesign -s - libSim2OpenXR.dylib --force --deep --verbose
 
 # Fixup monado JSON
-gsed "s|REPLACE_ME|$PWD|g" openxr_monado-dev.json.template > openxr_monado-dev.json
-
-
+#gsed "s|REPLACE_ME|$PWD|g" openxr_monado-dev.json.template > openxr_monado-dev.json
 
 
 #
@@ -150,13 +136,8 @@ gsed "s|REPLACE_ME|$PWD|g" openxr_monado-dev.json.template > openxr_monado-dev.j
 #
 
 # Couldn't figure out how to do this with CMake, but everything gets dynamically linked so it doesn't particularly matter and we can fixup the rpaths
-$INSTALL_NAME_TOOL -change @rpath/libSimulatorKit.dylib  @rpath/SimulatorKit.framework/Versions/A/SimulatorKit build/libXRGyroControls.dylib
 mkdir -p XRGyroControls.simdeviceui/Contents/MacOS/
 cp build/libXRGyroControls.dylib XRGyroControls.simdeviceui/Contents/MacOS/XRGyroControls
+$INSTALL_NAME_TOOL -change @rpath/libSimulatorKit.dylib  @rpath/SimulatorKit.framework/Versions/A/SimulatorKit XRGyroControls.simdeviceui/Contents/MacOS/XRGyroControls
 
-# Sign just in case (it complains anyway)
-codesign -s - XRGyroControls.simdeviceui --force --deep --verbose
-
-# Copy to CoreSimulator
-rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
-cp -r XRGyroControls.simdeviceui ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
+./install.sh
