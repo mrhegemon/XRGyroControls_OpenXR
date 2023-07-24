@@ -60,7 +60,7 @@ function fixup_dependency ()
     vtool_src=$2
     vtool_dst=$(basename $2)
     vtool -remove-build-version macos -output $vtool_dst $vtool_src
-    vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
+    vtool -set-build-version 12 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
     install_name_tool -change @rpath/$vtool_dst $(pwd)/$vtool_dst $which_dylib
     install_name_tool -change $vtool_src $(pwd)/$vtool_dst $which_dylib
 
@@ -109,12 +109,12 @@ fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/jpeg-turbo/lib/libjpeg
 # Pulled from iPhone X recovery ramdisk, some patches were done in a hex editor.
 vtool -remove-build-version macos -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
 vtool -remove-build-version ios -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
-vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
+vtool -set-build-version 12 1.0 1.0 -tool ld 902.11 -output IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
 codesign -s - IOUSBLib_ios_hax.dylib --force --deep --verbose
 
 # Fixup libusb bc we don't actually use the homebrew one
 vtool -remove-build-version macos -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
-vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
+vtool -set-build-version 12 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
 codesign -s - libusb-1.0.0.dylib --force --deep --verbose
 
 #vtool -remove-build-version ios -output  IOUSBLib_ios_macos.dylib IOUSBLib_ios_macos.dylib
@@ -126,7 +126,7 @@ fixup_dependency libMoltenVK.dylib libMoltenVK.dylib
 #vtool_src=libvulkan.1.dylib
 #vtool_dst=libvulkan.1.dylib
 #vtool -remove-build-version macos -output $vtool_dst $vtool_src
-#vtool -set-build-version xrossim 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
+#vtool -set-build-version 12 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
 
 # Sign everything just in case (it complains anyway)
 codesign -s - libopenxr_loader.dylib --force --deep --verbose
