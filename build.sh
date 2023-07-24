@@ -66,6 +66,8 @@ function fixup_dependency ()
     which_dylib=$1
     vtool_src=$2
     vtool_dst=$(basename $2)
+    chmod 777 $vtool_dst
+    chmod 777 $which_dylib
     cp $vtool_src $vtool_dst
 
     # Every framework has to be changed to remove "Versions/A/".
@@ -73,8 +75,7 @@ function fixup_dependency ()
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation $vtool_dst
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/Security.framework/Versions/A/Security /System/Library/Frameworks/Security.framework/Security $vtool_dst
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit /System/Library/Frameworks/IOKit.framework/IOKit $vtool_dst
-    #install_name_tool -change /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit $(pwd)/IOKit_arm64.dylib $vtool_dst
-
+    #$INSTALL_NAME_TOOL -change /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit $(pwd)/IOKit_arm64.dylib $vtool_dst
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/Metal.framework/Versions/A/Metal /System/Library/Frameworks/Metal.framework/Metal $vtool_dst
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface /System/Library/Frameworks/IOSurface.framework/IOSurface $vtool_dst
     $INSTALL_NAME_TOOL -change /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit /System/Library/Frameworks/AppKit.framework/AppKit $vtool_dst
@@ -89,18 +90,38 @@ function fixup_dependency ()
 
     $VTOOL -remove-build-version macos -output $vtool_dst $vtool_dst
     $VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output $vtool_dst $vtool_dst
-    $INSTALL_NAME_TOOL -change @rpath/$vtool_dst $(pwd)/$vtool_dst $which_dylib
-    $INSTALL_NAME_TOOL -change $vtool_src @rpath/$vtool_dst $which_dylib
-
+    $INSTALL_NAME_TOOL -id @rpath/$vtool_dst $vtool_dst
     codesign -s - $vtool_dst --force --deep --verbose
+
+    $INSTALL_NAME_TOOL -change @rpath/$vtool_dst @loader_path/$vtool_dst $which_dylib
+    $INSTALL_NAME_TOOL -change $vtool_src @loader_path/$vtool_dst $which_dylib
 }
+
+function check_exists ()
+{
+    which=$1
+    if ! [[ -f "$which" ]]; then
+        echo "missing file `$which`"
+        exit -1
+    fi
+}
+
+check_exists /opt/homebrew/lib/libopenxr_loader.dylib
+check_exists $MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib
+check_exists $VULKAN_SDK/lib/libvulkan.1.dylib
+check_exists $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
+check_exists /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
+check_exists libusb/libusb/.libs/libusb-1.0.0.dylib
+check_exists /opt/homebrew/opt/x264/lib/libx264.164.dylib
+check_exists /opt/homebrew/opt/cjson/lib/libcjson.1.dylib
+check_exists /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.8.dylib
+check_exists IOUSBLib_ios_hax.dylib
 
 # *slow chanting* hacks, hacks, HACKS **HACKS**
 fixup_dependency libSim2OpenXR.dylib /opt/homebrew/lib/libopenxr_loader.dylib
 fixup_dependency libSim2OpenXR.dylib $MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib
 fixup_dependency libSim2OpenXR.dylib $VULKAN_SDK/lib/libvulkan.1.dylib
 fixup_dependency libSim2OpenXR.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
-fixup_dependency libSim2OpenXR.dylib /opt/homebrew/opt/glfw/lib/libglfw.3.dylib
 fixup_dependency libSim2OpenXR.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
 
 #
@@ -108,7 +129,7 @@ fixup_dependency libSim2OpenXR.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.d
 #
 #fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/hidapi/lib/libhidapi.0.dylib
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
-fixup_dependency libopenxr_monado.dylib libusb/libusb/.libs/libusb-1.0.0.dylib
+fixup_dependency libopenxr_monado.dylib libusb/libusb/.libs/libusb-1.0.0.dylib # This must come *after* the homebrew libusb so that it copies over the unpatched one!
 fixup_dependency libopenxr_monado.dylib /opt/homebrew/opt/x264/lib/libx264.164.dylib
 fixup_dependency libopenxr_monado.dylib $VULKAN_SDK/lib/libvulkan.1.dylib
 fixup_dependency libopenxr_monado.dylib $VULKAN_SDK/../MoltenVK/dylib/iOS/libMoltenVK.dylib
@@ -121,8 +142,8 @@ $VTOOL -remove-build-version ios -output  IOUSBLib_ios_hax.dylib IOUSBLib_ios_ha
 $VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output IOUSBLib_ios_hax.dylib IOUSBLib_ios_hax.dylib
 
 # Fixup libusb bc we don't actually use the homebrew one
-$VTOOL -remove-build-version macos -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
-$VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib 
+$VTOOL -remove-build-version macos -output libusb-1.0.0.dylib libusb-1.0.0.dylib
+$VTOOL -set-build-version 12 1.0 1.0 -tool ld 902.11 -output libusb-1.0.0.dylib libusb-1.0.0.dylib
 
 cp libMoltenVK_iossim.dylib libMoltenVK.dylib
 fixup_dependency libMoltenVK.dylib libMoltenVK.dylib

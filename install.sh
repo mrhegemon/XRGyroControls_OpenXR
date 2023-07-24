@@ -17,10 +17,9 @@ gsed "s|REPLACE_ME|$PWD|g" openxr_monado-dev.json.template > openxr_monado-dev.j
 function fixup_paths_and_sign ()
 {
     which_dylib=$1
-    $INSTALL_NAME_TOOL -add_rpath $PWD $which_dylib
+    #$INSTALL_NAME_TOOL -add_rpath $PWD $which_dylib
     codesign -s - $which_dylib --force --deep --verbose
 }
-
 #
 # SimUI stuff
 #
@@ -34,7 +33,6 @@ fixup_paths_and_sign libvulkan.1.dylib
 fixup_paths_and_sign libSim2OpenXR.dylib
 fixup_paths_and_sign libMoltenVK.dylib
 fixup_paths_and_sign libcjson.1.dylib
-fixup_paths_and_sign libglfw.3.dylib
 fixup_paths_and_sign libjpeg.8.dylib
 fixup_paths_and_sign libvulkan.1.dylib
 fixup_paths_and_sign libx264.164.dylib
@@ -44,3 +42,13 @@ codesign -s - XRGyroControls.simdeviceui --force --deep --verbose
 # Copy to CoreSimulator
 rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
 cp -r XRGyroControls.simdeviceui ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
+
+# Adjust resolution
+cp new_device_plists/capabilities.plist "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/capabilities.plist"
+cp new_device_plists/profile.plist "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/profile.plist"
+
+if [[ $(csrutil status) != "System Integrity Protection status: disabled." ]]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "SIP is not disabled! Disable SIP!!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+fi

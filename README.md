@@ -2,9 +2,9 @@
 
 ## Binary Release Instructions
 
- - Disable SIP
- - Disable library validation (`sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist DisableLibraryValidation -bool true`)
-- You must have Xcode 15 Beta 2 installed to /Applications, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 app bundle (eg, `XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
+- Disable SIP
+- Disable library validation (`sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist DisableLibraryValidation -bool true`)
+- You must have Xcode 15 Beta 2 installed to `/Applications`, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 app bundle (eg, `export XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
 - Extract [binary release zip](https://github.com/shinyquagsire23/XRGyroControls_OpenXR/releases) any folder
 - Using terminal, navigate to the extracted folder.
 - Run `./install.sh`. This will sign all files for your machine, and adjust loading paths for the current folder. This only needs to be done once, but doing it multiple times will not cause any issues.
@@ -19,9 +19,10 @@ By default, Monado's simulated headset will run in the simulator. This headset g
 - The Quest Link video stream sometimes becomes juddery after sleeping the headset.
 - The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
 - The visionOS simulator window **must** be focused in order to use the Home button on controllers.
+- Sometimes the visionOS simulator will fail to run after too many launches, due to a MetalSim bug? Requires an OS restart.
 
 ## Accessing the old vision sim UI again
-- `rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui`
+- Run `./uninstall.sh`
 
 ## Building Instructions
 

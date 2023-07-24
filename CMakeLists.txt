@@ -113,4 +113,4 @@ target_link_libraries(XRGyroControls PRIVATE XRGyroControls_ObjC SimulatorKit /L
 #target_link_options(XRGyroControls PRIVATE -Wl,-U,_IndigoHIDGetKeyboardType)
 set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
-#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
+#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm)
