@@ -26,9 +26,10 @@ Run `build_run.sh` to reset and then inject into the visionOS simulator. Run `bu
 
 ## Known Issues
 
-- Quest Link sometimes does not receive AADT information, and the view will look distorted. Run `./build_run.sh` to reset the simulator and then try again.
+- ~~Quest Link sometimes does not receive AADT information, and the view will look distorted. Run `./build_run.sh` to reset the simulator and then try again.~~ Fixed with latest monado patches.
 - The Quest Link video stream sometimes becomes juddery after sleeping the headset.
 - The gaze ray gets stuck on the left controller when it disconnects
+- The visionOS simulator window must be focused in order to use the Home button on controllers.
 
 ## Accessing the old vision sim UI again
 - `rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui`
