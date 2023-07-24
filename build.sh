@@ -8,6 +8,7 @@ PWD=$(pwd)
 
 # These env vars can interfere w/ building
 unset MACOSX_DEPLOYMENT_TARGET
+#export MACOSX_DEPLOYMENT_TARGET="13.4"
 
 if [[ -z "${XCODE_BETA_PATH}" ]]; then
     export XCODE_BETA_PATH="/Applications/Xcode-beta.app"

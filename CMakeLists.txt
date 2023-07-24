@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.15.1)
 
+#set(CMAKE_OSX_DEPLOYMENT_TARGET "13.4")
+#set(CMAKE_OSX_SYSROOT "$ENV{XCODE_BETA_PATH}/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.0.sdk")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+set(CMAKE_OSX_SYSROOT "")
 project(XRGyroControls_OpenXR LANGUAGES Swift C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,7 +12,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows OR CMAKE_SYSTEM_NAME STREQUAL Darwin)
   option(BUILD_SHARED_LIBS "Build shared libraries by default" YES)
 endif()
 
-find_package(OpenGL REQUIRED)
 find_package(GLEW 2.0 REQUIRED)
 find_package(VULKAN REQUIRED Vulkan::Vulkan)
 
@@ -110,4 +113,4 @@ target_link_libraries(XRGyroControls PRIVATE XRGyroControls_ObjC SimulatorKit /L
 #target_link_options(XRGyroControls PRIVATE -Wl,-U,_IndigoHIDGetKeyboardType)
 set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
-#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${OPENGL_LIBRARIES} ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
+#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm ${GLFW_LINK_LIBRARIES})
