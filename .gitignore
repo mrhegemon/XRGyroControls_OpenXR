@@ -115,3 +115,7 @@ build_/
 a.out
 shaders/
 test_dlopen.c
+build__/
+build_simui/
+defaults.txt
+test2/
