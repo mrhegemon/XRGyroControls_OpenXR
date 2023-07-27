@@ -16,7 +16,6 @@ By default, Monado's simulated headset will run in the simulator. This headset g
 
 ## Known Issues
 
-- ~~Quest Link sometimes does not receive AADT information, and the view will look distorted. Run `./build_run.sh` to reset the simulator and then try again.~~ Fixed with latest monado patches.
 - The Quest Link video stream sometimes becomes juddery after sleeping the headset.
 - The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
 - The visionOS simulator window **must** be focused in order to use the Home button on controllers.
