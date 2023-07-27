@@ -54,7 +54,13 @@ add_library(Sim2OpenXR
   visionos_stereo_screenshots.m
 )
 #target_link_libraries(OpenXRCpp PRIVATE -framework Metal -framework CompositorServices)
-target_link_options(Sim2OpenXR PRIVATE -isysroot "$ENV{XCODE_BETA_PATH}/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk" -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator -Wl,-U,_RCPHIDEventGetSelectionRay, -Wl,-U,_RFAnchorPtrGetIndexTipTransform, -Wl,-U,___extractTargetTimes )
+target_link_options(Sim2OpenXR PRIVATE -Wl,-U,_RETransformComponentSetWorldMatrix4x4F, -Wl,-U,_RCPAnchorDefinitionComponentInitWithHand -Wl,-U,_RERenderFrameSettingsSetTotalTime -Wl,-U,_RERenderManagerWaitForFramePacing, -Wl,-U,_RSIsRunningOnSimulator -Wl,-U,_RCPHIDEventGetSelectionRay, -Wl,-U,_RFAnchorPtrGetIndexTipTransform, -Wl,-U,___extractTargetTimes -Wl,-U,_cp_drawable_encode_present -Wl,-U,_cp_drawable_get_color_texture -Wl,-U,_cp_drawable_get_depth_texture -Wl,-U,_cp_drawable_get_texture_count -Wl,-U,_cp_drawable_get_view -Wl,-U,_cp_drawable_get_view_count -Wl,-U,_cp_frame_query_drawable -Wl,-U,_cp_frame_timing_get_presentation_time -Wl,-U,_cp_frame_timing_get_rendering_deadline -Wl,-U,_cp_layer_properties_get_view_count -Wl,-U,_cp_view_get_view_texture_map)
+
+# HACK: change platform to macOS from visionOS for now
+add_custom_command(TARGET Sim2OpenXR
+                   PRE_LINK
+                   COMMAND bash -c "$ENV{XCODE_BETA_PATH}/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/vtool -remove-build-version 12 -output $<TARGET_OBJECTS:Sim2OpenXR> $<TARGET_OBJECTS:Sim2OpenXR>"
+                   )
 
 set_source_files_properties(visionos_stereo_screenshots.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc -isysroot \"$ENV{XCODE_BETA_PATH}/Contents/Developer/Platforms/XRSimulator.platform/Developer/SDKs/XRSimulator1.0.sdk\"")
 

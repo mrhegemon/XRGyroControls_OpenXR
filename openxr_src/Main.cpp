@@ -389,9 +389,23 @@ extern "C" int openxr_full_loop()
   return 0;
 }
 
+extern "C" int openxr_full_loop_thread()
+{
+  while(1)
+  {
+    openxr_full_loop();
+  }
+}
+
+static int thread_once = 0;
+
 extern "C" void openxr_spawn_renderframe()
 {
-  for (int i = 0; i < 32; i++)
+  /*if (!thread_once) {
+    std::thread(openxr_full_loop_thread).detach();
+    thread_once = 1;
+  }*/
+  for (int i = 0; i < 40; i++)
   {
     if (renderMutex.try_lock()) {
       //printf("spawn render...\n");
@@ -401,7 +415,7 @@ extern "C" void openxr_spawn_renderframe()
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  //printf("couldn't spawn render...\n");
+  printf("couldn't spawn render...\n");
   dataMutex.unlock();
 }
 

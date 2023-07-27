@@ -455,6 +455,7 @@ static double hook_RSUserSettings_worstAllowedFrameTime(void* self, double val) 
 }
 #endif
 
+#if 1
 static int (*real_RSXRRenderLoop_currentFrequency)(void* self);
 static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   int ret = real_RSXRRenderLoop_currentFrequency(self);
@@ -463,9 +464,10 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   //*(int *)(self + 0x140) = 2; //overcomitted
   //*(int *)(self + 0x144) = 1;
   //*(double *)(self + 0x188) = 0.08; //max frametime
-  *(int*)((intptr_t)self + 0x1EC) = 120;
+  //*(int*)((intptr_t)self + 0x1EC) = 120;
   return 120;
 }
+#endif
 
 @interface RSSimulatedHeadset
 - (void)getEyePose:(struct RSSimulatedHeadsetPose*)pose:(int)forEye;
@@ -580,12 +582,14 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setHMDPose);
   }
 
+#if 0
   {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
     Method method = class_getInstanceMethod(cls, @selector(currentFrequency));
     real_RSXRRenderLoop_currentFrequency = (void*)method_getImplementation(method);
     method_setImplementation(method, (IMP)hook_RSXRRenderLoop_currentFrequency);
   }
+#endif
 
   //openxr_main();
 }

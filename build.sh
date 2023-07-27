@@ -128,6 +128,7 @@ check_exists /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.8.dylib
 check_exists IOUSBLib_ios_hax.dylib
 
 # *slow chanting* hacks, hacks, HACKS **HACKS**
+fixup_dependency libSim2OpenXR.dylib libSim2OpenXR.dylib
 fixup_dependency libSim2OpenXR.dylib /opt/homebrew/lib/libopenxr_loader.dylib
 fixup_dependency libSim2OpenXR.dylib $MONADO_BUILD_DIR/src/xrt/targets/openxr/libopenxr_monado.dylib
 fixup_dependency libSim2OpenXR.dylib $VULKAN_SDK/lib/libvulkan.1.dylib

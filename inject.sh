@@ -7,12 +7,17 @@ fi
 SIMCTL=${XCODE_BETA_PATH}/Contents/Developer/usr/bin/simctl
 
 $SIMCTL spawn booted defaults write com.apple.RealitySystemSupport EnableReclinedMode 1
-$SIMCTL spawn booted defaults write com.apple.RealityEnvironment activeSyntheticEnvironment MuseumDay #KitchenDay    KitchenNight    LivingRoomDay   LivingRoomNight MuseumDay   MuseumNight
+#$SIMCTL spawn booted defaults write com.apple.RealityEnvironment activeSyntheticEnvironment MuseumDay #KitchenDay    KitchenNight    LivingRoomDay   LivingRoomNight MuseumDay   MuseumNight
 #$SIMCTL spawn booted defaults delete com.apple.RealitySimulation AllowImmersiveVirtualHands
 
 #$SIMCTL spawn booted defaults write com.apple.RealitySimulation AllowImmersiveVirtualHands 1
 $SIMCTL spawn booted defaults write com.apple.RealitySimulation ShowCursor 1
-#$SIMCTL spawn booted defaults write com.apple.RealitySimulation VirtualDisplayRefreshRate 10
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation OverlapRenderAndSimulation 0
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation VRRLateLatching 0
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation VRREnabled 0
+$SIMCTL spawn booted defaults delete com.apple.RealitySimulation OverrideRenderedContentFrameRate
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation SkipAlternatingFrames 0
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation SkipRedundantFrames 0
 #$SIMCTL spawn booted defaults write com.apple.RealitySimulation isVRREnabled 0
 #$SIMCTL spawn booted defaults delete com.apple.RealitySimulation SimulatedHeadset
 #$SIMCTL spawn booted defaults write com.apple.RealitySimulation DebugAXPointerEnabled 1

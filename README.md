@@ -5,7 +5,7 @@
 - Disable SIP
 - Disable library validation (`sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist DisableLibraryValidation -bool true`)
  - Install brew dependencies: `brew install gsed`
-- You must have Xcode 15 Beta 2 installed to `/Applications`, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 app bundle (eg, `export XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
+- You must have Xcode 15 Beta 2 (or 5) installed to `/Applications`, or `XCODE_BETA_PATH` set to your Xcode 15 Beta 2 (or 5) app bundle (eg, `export XCODE_BETA_PATH=/Applications/Xcode-beta.app`)
 - Extract [binary release zip](https://github.com/shinyquagsire23/XRGyroControls_OpenXR/releases) any folder
 - Using terminal, navigate to the extracted folder.
 - Run `./install.sh`. This will sign all files for your machine, and adjust loading paths for the current folder. This only needs to be done once, but doing it multiple times will not cause any issues.
@@ -20,6 +20,7 @@ By default, Monado's simulated headset will run in the simulator. This headset g
 - The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
 - The visionOS simulator window **must** be focused in order to use the Home button on controllers.
 - Sometimes the visionOS simulator will fail to run after too many launches, due to a MetalSim bug? Requires an OS restart.
+- visionOS 1.0 Beta 2 is a bit more judderier than Beta 1, currently.
 
 ## Accessing the old vision sim UI again
 - Run `./uninstall.sh`
@@ -41,7 +42,7 @@ Once all the prerequisites are done, run `./build.sh`.
 
 ## Build Troubleshooting
 
-- This repo has only been tested on macOS Sonoma Beta 2 and 3, Xcode 15 beta 2, and M1 macOS machines.
+- This repo has only been tested on macOS Sonoma Betas 2 and 3, Xcode 15 betas 2 and 5, and M1 macOS machines.
   - x86_64 is almost certainly broken currently -- It will need to *not* use the libusb patches and *not* use `IOUSBLib_ios_hax.dylib`. In theory it should be able to load IOUSBLib from the dylib cache w/o issues. It might also Just Work without any specific changes, dunno.
 - If `libusb` fails to build, ensure you have all dependencies (especially `autoconf` and `automake`), delete the `libusb` directory, and then run `./build.sh` again
 - If `libSim2OpenXR.dylib` fails to build, ensure you have all dependencies (especially `autoconf` and `automake`), delete the `libusb` directory, and then run `./build.sh` again.
