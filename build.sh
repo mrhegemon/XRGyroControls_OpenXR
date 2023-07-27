@@ -7,8 +7,8 @@ PWD=$(pwd)
 #cmake .. -DXRT_ENABLE_GPL=1 -DXRT_BUILD_DRIVER_EUROC=0 -DXRT_BUILD_DRIVER_NS=0 -DXRT_BUILD_DRIVER_PSVR=0 -DXRT_HAVE_OPENCV=0 -DXRT_HAVE_XCB=0 -DXRT_HAVE_XLIB=0 -DXRT_HAVE_XRANDR=0 -DXRT_HAVE_SDL2=0  -DXRT_HAVE_VT=0 -DXRT_FEATURE_WINDOW_PEEK=0 -DXRT_BUILD_DRIVER_QWERTY=0
 
 # These env vars can interfere w/ building
-#unset MACOSX_DEPLOYMENT_TARGET
-export MACOSX_DEPLOYMENT_TARGET="13.0"
+unset MACOSX_DEPLOYMENT_TARGET
+#export MACOSX_DEPLOYMENT_TARGET="13.0"
 
 if [[ -z "${XCODE_BETA_PATH}" ]]; then
     export XCODE_BETA_PATH="/Applications/Xcode-beta.app"
@@ -36,12 +36,14 @@ fi
 popd
 
 # Build simui, and if it errors then abort
+export MACOSX_DEPLOYMENT_TARGET="13.0"
 cmake -B build_simui -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S simui
 ninja -C build_simui -v
 retVal=$?
 if [ $retVal -ne 0 ]; then
     exit $retVal
 fi
+unset MACOSX_DEPLOYMENT_TARGET
 
 # Build, and if it errors then abort
 cmake -B build -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S .
