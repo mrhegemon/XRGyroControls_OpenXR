@@ -161,6 +161,13 @@ void hook_RERenderManagerWaitForFramePacing(void* ctx)
 DYLD_INTERPOSE(hook_RERenderManagerWaitForFramePacing, RERenderManagerWaitForFramePacing);
 #endif
 
+extern int cp_layer_get_state(void* a);
+static int hook_cp_layer_get_state(void* a)
+{
+  return cp_layer_get_state(a);
+}
+DYLD_INTERPOSE(hook_cp_layer_get_state, cp_layer_get_state);
+
 static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   gHookedDrawable = nil;
@@ -462,9 +469,25 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   //printf("frequency at %d\n", ret);
   //printf("%f\n", *(double *)(self + 0x188));
   //*(int *)(self + 0x140) = 2; //overcomitted
-  //*(int *)(self + 0x144) = 1;
+  //*(int *)(self + 0x144) = 3;
+  //*(int *)(self + 0x148) = 2;
+  //*(int *)(self + 0x13C) = 3;
   //*(double *)(self + 0x188) = 0.08; //max frametime
   //*(int*)((intptr_t)self + 0x1EC) = 120;
+
+  *(double *)(self + 0x150) = -0.000050;
+  *(double *)(self + 0x158) = -0.000050;
+  *(double *)(self + 0x160) = 0.000000;
+
+  //*(double *)(self + 0x1A0) = 0.000000050;
+
+  /*
+  *(double *)(self + 0x150) = 0.000050;
+  *(double *)(self + 0x158) = 0.000050;
+  *(double *)(self + 0x160) = 2.000000;
+  */
+
+  //printf("test %f %f %f\n", *(double *)(self + 0x150), *(double *)(self + 0x158), *(double *)(self + 0x160));
   return 120;
 }
 #endif
@@ -582,7 +605,7 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setHMDPose);
   }
 
-#if 0
+#if 1
   {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
     Method method = class_getInstanceMethod(cls, @selector(currentFrequency));
