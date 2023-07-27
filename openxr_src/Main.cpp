@@ -1,5 +1,5 @@
 #include "../openxr-Bridging-Header.h"
-#include "../simui_src/simui_types.h"
+#include "../simui/simui_src/simui_types.h"
 #include "Context.h"
 #include "Headset.h"
 #include "Renderer.h"

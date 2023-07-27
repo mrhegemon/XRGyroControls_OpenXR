@@ -23,10 +23,6 @@ pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# SimulatorKit framework
-add_library(SimulatorKit SimulatorKit/SimulatorKit.swift)
-target_compile_options(SimulatorKit PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator)
-
 add_library(OpenXRCpp STATIC
   openxr_src/Buffer.cpp
   openxr_src/Buffer.h
@@ -98,19 +94,3 @@ target_link_libraries(Sim2OpenXR PRIVATE $ENV{MONADO_BUILD_DIR}/src/xrt/targets/
 target_link_libraries(Sim2OpenXR PRIVATE $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib Threads::Threads)
 
 target_include_directories(OpenXRCpp PRIVATE ${GLEW_INCLUDE_DIRS}  ${LIBUSB_INCLUDE_DIRS}  $ENV{VULKAN_SDK}/include)
-
-
-
-# SimUI library
-add_library(XRGyroControls_ObjC STATIC simui_src/SimulatorObjC.m)
-set_source_files_properties(simui_src/SimulatorObjC.m PROPERTIES COMPILE_FLAGS "-fmodules -fobjc-arc")
-
-add_library(XRGyroControls 
-  simui_src/IndigoHID.swift simui_src/SimulatorSupport.swift 
-)
-target_compile_options(XRGyroControls PRIVATE -I ${CMAKE_SOURCE_DIR}/CoreSimulator -import-objc-header ${CMAKE_SOURCE_DIR}/simui_src/simui-Bridging-Header.h)
-target_link_libraries(XRGyroControls PRIVATE XRGyroControls_ObjC SimulatorKit /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator "-framework Carbon")
-#target_link_options(XRGyroControls PRIVATE -Wl,-U,_IndigoHIDGetKeyboardType)
-set_target_properties(XRGyroControls PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
-
-#target_link_libraries(XRGyroControls PRIVATE OpenXRCpp ${SDL2_LINK_LIBRARIES} ${GLEW_LIBRARIES} m glm)

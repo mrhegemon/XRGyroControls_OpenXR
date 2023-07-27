@@ -7,8 +7,8 @@ PWD=$(pwd)
 #cmake .. -DXRT_ENABLE_GPL=1 -DXRT_BUILD_DRIVER_EUROC=0 -DXRT_BUILD_DRIVER_NS=0 -DXRT_BUILD_DRIVER_PSVR=0 -DXRT_HAVE_OPENCV=0 -DXRT_HAVE_XCB=0 -DXRT_HAVE_XLIB=0 -DXRT_HAVE_XRANDR=0 -DXRT_HAVE_SDL2=0  -DXRT_HAVE_VT=0 -DXRT_FEATURE_WINDOW_PEEK=0 -DXRT_BUILD_DRIVER_QWERTY=0
 
 # These env vars can interfere w/ building
-unset MACOSX_DEPLOYMENT_TARGET
-#export MACOSX_DEPLOYMENT_TARGET="13.4"
+#unset MACOSX_DEPLOYMENT_TARGET
+export MACOSX_DEPLOYMENT_TARGET="13.0"
 
 if [[ -z "${XCODE_BETA_PATH}" ]]; then
     export XCODE_BETA_PATH="/Applications/Xcode-beta.app"
@@ -34,6 +34,14 @@ if [ $retVal -ne 0 ]; then
     exit $retVal
 fi
 popd
+
+# Build simui, and if it errors then abort
+cmake -B build_simui -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S simui
+ninja -C build_simui -v
+retVal=$?
+if [ $retVal -ne 0 ]; then
+    exit $retVal
+fi
 
 # Build, and if it errors then abort
 cmake -B build -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_TESTING=YES -G Ninja -S .
@@ -158,7 +166,7 @@ fixup_dependency libMoltenVK.dylib libMoltenVK.dylib
 
 # Couldn't figure out how to do this with CMake, but everything gets dynamically linked so it doesn't particularly matter and we can fixup the rpaths
 mkdir -p XRGyroControls.simdeviceui/Contents/MacOS/
-cp build/libXRGyroControls.dylib XRGyroControls.simdeviceui/Contents/MacOS/XRGyroControls
+cp build_simui/libXRGyroControls.dylib XRGyroControls.simdeviceui/Contents/MacOS/XRGyroControls
 $INSTALL_NAME_TOOL -change @rpath/libSimulatorKit.dylib  @rpath/SimulatorKit.framework/Versions/A/SimulatorKit XRGyroControls.simdeviceui/Contents/MacOS/XRGyroControls
 
 ./install.sh
