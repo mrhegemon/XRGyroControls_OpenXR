@@ -61,6 +61,7 @@ import os
             //hid_client.send(message: IndigoHIDMessage.pose(IndigoHIDMessage.gaze_x1, IndigoHIDMessage.gaze_y1, IndigoHIDMessage.gaze_z1, IndigoHIDMessage.gaze_qx, IndigoHIDMessage.gaze_qy, IndigoHIDMessage.gaze_qz, IndigoHIDMessage.gaze_qw).as_struct())
             //hid_client.send(message: IndigoHIDMessage.pose(IndigoHIDMessage.gaze_x1, IndigoHIDMessage.gaze_y1, IndigoHIDMessage.gaze_z1, 0.0, 0.0, 0.0, 1.0).as_struct())
             //hid_client.send(message: IndigoHIDMessage.pose(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0).as_struct())
+            //hid_client.send(message: IndigoHIDMessage.pose(pose.l_x, pose.l_y, pose.l_z, 0.0, 0.0, 0.0, 1.0).as_struct())
             hid_client.send(message: IndigoHIDMessage.pose(pose.l_x, pose.l_y, pose.l_z, pose.l_qx, pose.l_qy, pose.l_qz, pose.l_qw).as_struct())
             hid_client.send(message: IndigoHIDMessage.manipulator(asdf, pose).as_struct())
             //hid_client.send(message: IndigoHIDMessage.digitaldial(1.0).as_struct())
@@ -80,7 +81,7 @@ import os
                 //ObjCBridge_HomeButtonPressUp();
             }
 
-            Thread.sleep(forTimeInterval: 0.001)
+            Thread.sleep(forTimeInterval: 0.004)
             //Thread.sleep(forTimeInterval: 0.5)
         }
 

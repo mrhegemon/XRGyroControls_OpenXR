@@ -287,7 +287,7 @@ extern "C" int openxr_full_loop(int which)
     //printf("wait for frame...\n");
     for (int i = 0; i < 32; i++)
     {
-      if (renderMutex2[0].try_lock()) 
+      if (renderMutex2[which].try_lock()) 
       {
         break;
       }
@@ -330,7 +330,7 @@ extern "C" void openxr_spawn_renderframe(int which)
 extern "C" void openxr_complete_renderframe(int which)
 {
   //printf("frame completed, unlocking\n");
-  renderMutex2[0].unlock();
+  renderMutex2[which].unlock();
 }
 
 extern "C" int openxr_done()

@@ -28,9 +28,19 @@ static simd_float4x4 gWorldMat = {.columns = {
                                             {0, 0, 1, 0},
                                             {0, 2.0, 0, 1},
                                         }};
+static simd_float4x4 gNewWorldMat = {.columns = {
+                                            {1, 0, 0, 0},
+                                            {0, 1, 0, 0},
+                                            {0, 0, 1, 0},
+                                            {0, 2.0, 0, 1},
+                                        }};
 
 static simd_float4x4 left_controller_pose;
 static simd_float4x4 right_controller_pose;
+
+simd_float4x4 view_mat_l;
+simd_float4x4 view_mat_r;
+openxr_headset_data xr_data;
 
 static simd_float4 left_eye_pos;
 static simd_float4 left_eye_quat;
@@ -69,6 +79,27 @@ typedef struct cp_time {
 } cp_time;
 */
 
+typedef struct cp_frame_timing
+{
+  uint64_t unk_0;
+  uint64_t unk_8;
+  uint64_t unk_10;
+  uint64_t unk_18;
+  uint64_t unk_20;
+  uint64_t target_vbl;
+  uint64_t unk_30;
+  uint64_t time_base_idk;
+  uint64_t unk_40;
+  uint64_t unk_48;
+  uint64_t idk_offset;
+  uint64_t optimal_input_time;
+  uint64_t rendering_deadline;
+  uint64_t presentation_time;
+  uint64_t unk_70;
+  uint64_t unk_78;
+  uint64_t unk_80;
+} cp_frame_timing;
+
 static id<MTLTexture> gOrigTextureList[3] = {nil,nil,nil};
 
 // TODO(zhuowei): multiple screenshots in flight
@@ -78,6 +109,8 @@ static id<MTLTexture> gHookedRightTexture[3] = {nil,nil,nil};
 static id<MTLTexture> gHookedRightDepthTexture[3] = {nil,nil,nil};
 static id<MTLTexture> gHookedLeftTexture[3] = {nil,nil,nil};
 static id<MTLTexture> gHookedLeftDepthTexture[3] = {nil,nil,nil};
+static id<MTLTexture> gHookedRightTextureCopy[3] = {nil,nil,nil};
+static id<MTLTexture> gHookedLeftTextureCopy[3] = {nil,nil,nil};
 
 static id<MTLTexture> gHookedSimulatorPreviewTexture[3] = {nil,nil,nil};
 
@@ -93,9 +126,6 @@ RSSimulatedHeadset* gHookedSimulatedHeadset = nil;
 SEL gHookedSimulatedHeadset_sel;
 static void (*real_RSSimulatedHeadset_setHMDPose)(RSSimulatedHeadset* self, SEL sel,
                                                   struct RSSimulatedHeadsetPose pose);
-
-void cp_drawable_set_pose(cp_drawable_t,simd_float4x4);
-void cp_drawable_set_simd_pose(cp_drawable_t,simd_float4x4);
 
 static float CalculateFovY(float fovX, float aspect) {
   // https://cs.android.com/android/platform/superproject/+/master:external/exoplayer/tree/library/ui/src/main/java/com/google/android/exoplayer2/ui/spherical/SphericalGLSurfaceView.java;l=328;drc=2c30c028bf6b958edf635b3e4e1079e64737250a
@@ -116,23 +146,6 @@ static id<MTLTexture> MakeOurTextureBasedOnTheirTexture(id<MTLDevice> device,
   return [device newTextureWithDescriptor:descriptor];
 }
 
-#if 0
-static ar_pose_t hook_cp_drawable_get_ar_pose(cp_drawable_t drawable) {
-  ar_pose_t retval = cp_drawable_get_ar_pose(drawable);
-  printf("%p\n", retval);
-  return retval;
-}
-
-DYLD_INTERPOSE(hook_cp_drawable_get_ar_pose, cp_drawable_get_ar_pose);
-
-static void hook_cp_drawable_set_simd_pose(cp_drawable_t drawable, simd_float4x4 pose) {
-  cp_drawable_set_simd_pose(drawable, pose);
-  printf("set_simd_pose %p\n", drawable);
-}
-
-DYLD_INTERPOSE(hook_cp_drawable_set_simd_pose, cp_drawable_set_simd_pose);
-#endif
-
 int _os_feature_enabled_impl(const char* a, const char* b);
 static int hook__os_feature_enabled_impl(const char* a, const char* b)
 {
@@ -145,20 +158,22 @@ static int hook__os_feature_enabled_impl(const char* a, const char* b)
 }
 DYLD_INTERPOSE(hook__os_feature_enabled_impl, _os_feature_enabled_impl);
 
-void RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a);
-static void hook_RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a)
-{
-  gWorldMat = a;
-  //RETransformComponentSetWorldMatrix4x4F(gIdentityMat);
-  RETransformComponentSetWorldMatrix4x4F(a);
-}
-DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
+static int num_frames_done = 0;
 
-#if 0
-static void* hook_cp_frame_predict_timing(void* a)
+#if 1
+static cp_frame_timing* hook_cp_frame_predict_timing(void* a)
 {
-  return cp_frame_predict_timing(a);
+  cp_frame_timing* ret = cp_frame_predict_timing(a);
+
+  //ret->time_base_idk -= 199998;
+  ret->rendering_deadline = 0;
+  ret->presentation_time = 0;
+  ret->idk_offset = 199998;//149998/2;
+  //printf("%llx %llx\n", ret->optimal_input_time, ret->idk_offset);
+
+  return ret;
 }
+DYLD_INTERPOSE(hook_cp_frame_predict_timing, cp_frame_predict_timing);
 
 static struct cp_time hook_cp_frame_timing_get_presentation_time(void* a)
 {
@@ -174,9 +189,21 @@ static struct cp_time hook_cp_frame_timing_get_presentation_time(void* a)
 }
 DYLD_INTERPOSE(hook_cp_frame_timing_get_presentation_time, cp_frame_timing_get_presentation_time);
 
+//extern  struct cp_time hook_cp_frame_timing_get_optimal_input_time(void* a);
+static struct cp_time hook_cp_frame_timing_get_optimal_input_time(void* a)
+{
+  /*struct cp_time val = cp_frame_timing_get_rendering_deadline(a);
+  val.cp_mach_abs_time -= 40000;
+  return val;*/
+  //struct cp_time val = {mach_absolute_time()};
+  //return val;
+  return cp_frame_timing_get_optimal_input_time(a);
+}
+DYLD_INTERPOSE(hook_cp_frame_timing_get_optimal_input_time, cp_frame_timing_get_optimal_input_time);
+
 static struct cp_time hook_cp_frame_timing_get_rendering_deadline(void* a)
 {
-  //struct cp_time val = {mach_absolute_time()};
+  //struct cp_time val = {mach_absolute_time() + 80000};
   //return val;
 
   return cp_frame_timing_get_rendering_deadline(a);
@@ -189,6 +216,7 @@ static int hook_cp_frame_timing_get_frame_repeat_count(void* a)
   return 0;
 }
 DYLD_INTERPOSE(hook_cp_frame_timing_get_frame_repeat_count, cp_frame_timing_get_frame_repeat_count);
+
 #endif
 
 #if 0
@@ -242,46 +270,29 @@ int which_buffer_is_this(id<MTLTexture> originalTexture)
 }
 
 static int last_which = -1;
-
-static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
+static int pulled_which = -1;
+void pull_openxr_data()
+{
   int which_guess = (last_which + 1) % 3;
+
+  if (pulled_which == which_guess) {
+    return;
+  }
+
   // We do this first, because query_drawable might stall...?
-  openxr_headset_data xr_data;
   memset(&xr_data, 0, sizeof(xr_data));
   if (num_buffers_collected() >= 3)
   {
-    openxr_set_textures(&gHookedLeftTexture, &gHookedRightTexture, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
+    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, gHookedRightTextureCopy[0].width, gHookedRightTextureCopy[0].height);
 
     openxr_spawn_renderframe(which_guess);
 
     // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
     openxr_headset_get_data(&xr_data, which_guess);
+
+    pulled_which = which_guess;
   }
 
-  cp_drawable_t retval = cp_frame_query_drawable(frame);
-  int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
-  last_which = which;
-  if (!gHookedRightTexture[which]) {
-    // only make this once
-    id<MTLDevice> metalDevice = MTLCreateSystemDefaultDevice();
-    id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
-    id<MTLTexture> originalDepthTexture = cp_drawable_get_depth_texture(retval, 0);
-    
-    gHookedRightTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
-    gHookedRightDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
-    gHookedLeftTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
-    gHookedLeftDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
-  }
-
-  gHookedDrawable[which] = retval;
-  gHookedSimulatorPreviewTexture[which] = cp_drawable_get_color_texture(retval, 0);
-
-  cp_view_t simView = cp_drawable_get_view(retval, 0);
-  cp_view_t rightView = cp_drawable_get_view(retval, 1);
-  memcpy(rightView, simView, sizeof(*simView));
-
-  cp_view_get_view_texture_map(rightView)->texture_index = 1;
-  cp_view_get_view_texture_map(simView)->texture_index = 2; // HACK: move the sim view to the left eye texture index
 
   // Apple
   // X is -left/+right
@@ -306,9 +317,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   right_eye_quat[1] = xr_data.r_qy;
   right_eye_quat[2] = xr_data.r_qz;
   right_eye_quat[3] = xr_data.r_qw;
-
-  simd_float4x4 view_mat_l;
-  simd_float4x4 view_mat_r;
 
   if (xr_data.view_l)
   {
@@ -341,9 +349,52 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     }
   }
 
-  simView->height_maybe = 0.0f;
-  rightView->height_maybe = 0.0f;
+  left_eye_zbasis[0] = view_mat_l.columns[2][0];
+  left_eye_zbasis[1] = view_mat_l.columns[2][1];
+  left_eye_zbasis[2] = view_mat_l.columns[2][2];
+  left_eye_zbasis[3] = view_mat_l.columns[2][3];
 
+  gNewWorldMat = view_mat_l;
+
+  if (gHookedSimulatedHeadset) {
+    struct RSSimulatedHeadsetPose pose;
+    pose.position = left_eye_pos;
+    pose.rotation = left_eye_quat;
+
+    real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
+  }
+}
+
+static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
+  num_frames_done++;
+
+  cp_drawable_t retval = cp_frame_query_drawable(frame);
+  int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
+  last_which = which;
+  if (!gHookedRightTexture[which]) {
+    // only make this once
+    id<MTLDevice> metalDevice = MTLCreateSystemDefaultDevice();
+    id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
+    id<MTLTexture> originalDepthTexture = cp_drawable_get_depth_texture(retval, 0);
+    
+    gHookedRightTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    gHookedRightDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
+    gHookedLeftTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    gHookedLeftDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
+
+    gHookedRightTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    gHookedLeftTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+  }
+
+  gHookedDrawable[which] = retval;
+  gHookedSimulatorPreviewTexture[which] = cp_drawable_get_color_texture(retval, 0);
+
+  cp_view_t simView = cp_drawable_get_view(retval, 0);
+  cp_view_t rightView = cp_drawable_get_view(retval, 1);
+  memcpy(rightView, simView, sizeof(*simView));
+
+  cp_view_get_view_texture_map(rightView)->texture_index = 1;
+  cp_view_get_view_texture_map(simView)->texture_index = 2; // HACK: move the sim view to the left eye texture index
 
   float fovAngleLeft_l   = -42 * M_PI / 180;
   float fovAngleRight_l  =  40 * M_PI / 180;
@@ -378,22 +429,12 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     rightView->tangents = tangents_r;
   }
 
+  simView->height_maybe = 0.0f;
+  rightView->height_maybe = 0.0f;
+
   //simView->transform = view_mat_l;
   rightView->transform = view_mat_r;
   simView->transform = gIdentityMat;
-
-  left_eye_zbasis[0] = view_mat_l.columns[2][0];
-  left_eye_zbasis[1] = view_mat_l.columns[2][1];
-  left_eye_zbasis[2] = view_mat_l.columns[2][2];
-  left_eye_zbasis[3] = view_mat_l.columns[2][3];
-
-  if (gHookedSimulatedHeadset) {
-    struct RSSimulatedHeadsetPose pose;
-    pose.position = left_eye_pos;
-    pose.rotation = left_eye_quat;
-
-    real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
-  }
 
   return retval;
 }
@@ -414,7 +455,6 @@ extern void cp_drawable_present(cp_drawable_t drawable);
 static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
-  //printf("%u\n", which);
   if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3) {
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
       openxr_complete_renderframe(which);
@@ -425,6 +465,16 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
   [blit copyFromTexture:gHookedLeftTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture[which].width, gHookedLeftTexture[which].height, 1) toTexture:gHookedSimulatorPreviewTexture[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
   [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture[which]];
   [blit endEncoding];
+
+  id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
+  [blitL copyFromTexture:gHookedLeftTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture[which].width, gHookedLeftTexture[which].height, 1) toTexture:gHookedLeftTextureCopy[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
+  [blitL generateMipmapsForTexture:gHookedLeftTextureCopy[which]];
+  [blitL endEncoding];
+
+  id<MTLBlitCommandEncoder> blitR = [command_buffer blitCommandEncoder];
+  [blitR copyFromTexture:gHookedRightTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedRightTexture[which].width, gHookedRightTexture[which].height, 1) toTexture:gHookedRightTextureCopy[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
+  [blitR generateMipmapsForTexture:gHookedRightTextureCopy[which]];
+  [blitR endEncoding];
 
   cp_drawable_encode_present(drawable, command_buffer);
   //cp_drawable_present(drawable);
@@ -456,32 +506,6 @@ int hook_RCPHIDEventGetSelectionRay(void* ctx, struct RSSimulatedHeadsetPose* po
   return ret;
 }
 DYLD_INTERPOSE(hook_RCPHIDEventGetSelectionRay, RCPHIDEventGetSelectionRay);
-#endif
-
-#if 0
-void RFAnchorPtrGetIndexTipTransform(void*);
-void hook_RFAnchorPtrGetIndexTipTransform(void* a) {
-  RFAnchorPtrGetIndexTipTransform(a);
-}
-DYLD_INTERPOSE(hook_RFAnchorPtrGetIndexTipTransform, RFAnchorPtrGetIndexTipTransform);
-#endif
-
-#if 0
-extern int __extractTargetTimes(void*, void* ,void*);
-int hook__extractTargetTimes(void* a, void* b, void* c)
-{
-  return __extractTargetTimes(a,b,c);
-}
-#endif
-//DYLD_INTERPOSE(hook__extractTargetTimes, _extractTargetTimes);
-
-#if 0
-void __WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__();
-void hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__()
-{
-
-}
-//DYLD_INTERPOSE(hook___WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__, __WAITING_FOR_ENCODING_START_TIME_FOR_BEST_HEAD_POSE__);
 #endif
 
 static size_t hook_cp_drawable_get_view_count(cp_drawable_t drawable) { return NUM_VIEWS; }
@@ -524,35 +548,11 @@ static size_t hook_cp_layer_properties_get_view_count(cp_layer_renderer_properti
 
 DYLD_INTERPOSE(hook_cp_layer_properties_get_view_count, cp_layer_properties_get_view_count);
 
-cp_layer_renderer_layout cp_layer_configuration_get_layout_private(
-    cp_layer_renderer_configuration_t configuration);
-
-/*static cp_layer_renderer_layout hook_cp_layer_configuration_get_layout_private(
-    cp_layer_renderer_configuration_t configuration) {
-  return cp_layer_renderer_layout_dedicated;
-}
-
-DYLD_INTERPOSE(hook_cp_layer_configuration_get_layout_private,
-               cp_layer_configuration_get_layout_private);*/
-
-#if 0
-static void hook_sleep(unsigned int a) {
-  //sleep(a);
-}
-DYLD_INTERPOSE(hook_sleep, sleep);
-#endif
-
-static void hook_mach_wait_until(void* a)
-{
-
-}
-DYLD_INTERPOSE(hook_mach_wait_until, mach_wait_until);
-
 #if 0
 void RERenderFrameSettingsSetTotalTime(void* re, float time);
 static void hook_RERenderFrameSettingsSetTotalTime(void* re, float time) {
   //printf("_RERenderFrameSettingsSetTotalTime %f\n", time);
-  RERenderFrameSettingsSetTotalTime(re, time - 0.03125 + 0.008);
+  RERenderFrameSettingsSetTotalTime(re, 0.0); //time - 0.03125 + 0.008
 }
 
 DYLD_INTERPOSE(hook_RERenderFrameSettingsSetTotalTime, RERenderFrameSettingsSetTotalTime);
@@ -569,18 +569,26 @@ static double hook_RSUserSettings_worstAllowedFrameTime(void* self, double val) 
 }
 #endif
 
-#if 0
+#if 1
 static int (*real_RSXRRenderLoop_currentFrequency)(void* self);
 static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   int ret = real_RSXRRenderLoop_currentFrequency(self);
   //printf("frequency at %d\n", ret);
+
+#if 0  
   //printf("%f\n", *(double *)(self + 0x188));
   //*(int *)(self + 0x140) = 2; //overcomitted
   //*(int *)(self + 0x144) = 3;
   //*(int *)(self + 0x148) = 2;
   //*(int *)(self + 0x13C) = 3;
-  //*(double *)(self + 0x188) = 0.08; //max frametime
-  //*(int*)((intptr_t)self + 0x1EC) = 120;
+  *(double *)(self + 0x1a0) = 0.004; //autoFPSWorstAllowedFrameTime
+  *(double *)(self + 0x1a8) = 0.004; //baseFrameDurationMAT 
+  *(double *)(self + 0x1B0) = 0.004; //baseFrameDuration 
+  *(double *)(self + 0x1B8) = 0.004;//399999.0 / 2.0; // compositorTargetFrameDurationMAT
+  //*(double *)(self + 0x1C0) = //compositorTargetFrameDuration
+  //*(double *)(self + 0x1C8) = //allowedHeadStart
+  //printf("idk %f\n", *(double *)(self + 0x1B8));
+  *(int*)((intptr_t)self + 0x20C) = 240;
 
   *(double *)(self + 0x150) = -0.000050;
   *(double *)(self + 0x158) = -0.000050;
@@ -595,23 +603,10 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   */
 
   //printf("test %f %f %f\n", *(double *)(self + 0x150), *(double *)(self + 0x158), *(double *)(self + 0x160));
-  return 120;
+#endif
+  return ret;
 }
 #endif
-
-extern int os_workgroup_interval_start(os_workgroup_interval_t wg, uint64_t start, uint64_t deadline, os_workgroup_interval_data_t data);
-static int hook_os_workgroup_interval_start(os_workgroup_interval_t wg, uint64_t start, uint64_t deadline, os_workgroup_interval_data_t data)
-{
-  return os_workgroup_interval_start(wg, start, deadline, data);
-}
-DYLD_INTERPOSE(hook_os_workgroup_interval_start, os_workgroup_interval_start);
-
-extern int os_signpost_enabled(void* a);
-static int hook_os_signpost_enabled(void* a)
-{
-  return 1;
-}
-DYLD_INTERPOSE(hook_os_signpost_enabled, os_signpost_enabled);
 
 static void (*real_RSSimulatedHeadset_getEyePose)(RSSimulatedHeadset* self, SEL sel,
                                                   struct RSSimulatedHeadsetPose* pose, int forEye);
@@ -619,7 +614,7 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
                                                struct RSSimulatedHeadsetPose* pose, int forEye) {
   real_RSSimulatedHeadset_getEyePose(self, sel, pose, forEye);
   
-  /*if (forEye == 0)
+  if (forEye == 0)
   {
     pose->position = left_eye_pos;
     pose->rotation = left_eye_quat;
@@ -628,7 +623,7 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose->position = right_eye_pos;
     pose->rotation = right_eye_quat;
-  }*/
+  }
   /*else if (forEye == 2)
   {
     pose->position = left_eye_pos;
@@ -636,6 +631,18 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   }*/
   
   //printf("get eye pos %u, %f %f %f %f\n", forEye, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);
+}
+
+static void (*real_RSSimulatedHeadset_getPose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose* pose, double time);
+static void hook_RSSimulatedHeadset_getPose(RSSimulatedHeadset* self, SEL sel,
+                                               struct RSSimulatedHeadsetPose* pose, double time) {
+  real_RSSimulatedHeadset_getPose(self, sel, pose, time);
+  
+  pull_openxr_data();
+
+  pose->position = left_eye_pos;
+  pose->rotation = left_eye_quat;
 }
 
 static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL sel,
@@ -708,6 +715,15 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_getEyePose);
   }
 
+#if 1
+  {
+    Class cls = NSClassFromString(@"RSSimulatedHeadset");
+    Method method = class_getInstanceMethod(cls, @selector(getPose:atTime:));
+    real_RSSimulatedHeadset_getPose = (void*)method_getImplementation(method);
+    method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_getPose);
+  }
+#endif
+
   {
     Class cls = NSClassFromString(@"RSSimulatedHeadset");
     Method method = class_getInstanceMethod(cls, @selector(setEyePose:forEye:));
@@ -722,7 +738,7 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setHMDPose);
   }
 
-#if 0
+#if 1
   {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
     Method method = class_getInstanceMethod(cls, @selector(currentFrequency));
