@@ -80,7 +80,7 @@ import os
                 //ObjCBridge_HomeButtonPressUp();
             }
 
-            Thread.sleep(forTimeInterval: 0.004)
+            Thread.sleep(forTimeInterval: 0.001)
             //Thread.sleep(forTimeInterval: 0.5)
         }
 

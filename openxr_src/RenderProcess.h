@@ -19,6 +19,10 @@ public:
                 VkImageView textureImageView2,
                 VkSampler textureSampler2);
   ~RenderProcess();
+  void UpdateImages(VkImageView textureImageView,
+               VkSampler textureSampler,
+               VkImageView textureImageView2,
+               VkSampler textureSampler2);
 
   struct UniformBufferData final
   {

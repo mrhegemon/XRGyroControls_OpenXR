@@ -266,7 +266,7 @@ void Renderer::copyBufferToImage(const Context* context, VkBuffer buffer, VkImag
     endSingleTimeCommands(context, commandBuffer);
 }
 
-void Renderer::createTextureImage_L(const Context* context) {
+void Renderer::createTextureImage_L(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
   int texWidth = 32;
@@ -296,17 +296,17 @@ void Renderer::createTextureImage_L(const Context* context) {
     }
   vkUnmapMemory(vkDevice, stagingBufferMemory);
 
-  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L, textureImageMemory_L);
+  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], textureImageMemory_L[which]);
 
-  transitionImageLayout(context, textureImage_L, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_L, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_L, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(context, stagingBuffer, textureImage_L[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
   vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
 }
 
-void Renderer::createTextureImageHax_L(const Context* context) {
+void Renderer::createTextureImageHax_L(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
   int texWidth = metal_tex_w;
@@ -336,17 +336,17 @@ void Renderer::createTextureImageHax_L(const Context* context) {
     }
   vkUnmapMemory(vkDevice, stagingBufferMemory);
 
-  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L, textureImageMemory_L, metal_tex_l);
+  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], textureImageMemory_L[which], metal_tex_l[which]);
 
-  transitionImageLayout(context, textureImage_L, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_L, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_L, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(context, stagingBuffer, textureImage_L[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
   vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
 }
 
-void Renderer::createTextureImage_R(const Context* context) {
+void Renderer::createTextureImage_R(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
   int texWidth = metal_tex_w;
@@ -376,17 +376,17 @@ void Renderer::createTextureImage_R(const Context* context) {
     }
   vkUnmapMemory(vkDevice, stagingBufferMemory);
 
-  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R, textureImageMemory_R);
+  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], textureImageMemory_R[which]);
 
-  transitionImageLayout(context, textureImage_R, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_R, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_R, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(context, stagingBuffer, textureImage_R[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
   vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
 }
 
-void Renderer::createTextureImageHax_R(const Context* context) {
+void Renderer::createTextureImageHax_R(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
   int texWidth = 32;
@@ -416,11 +416,11 @@ void Renderer::createTextureImageHax_R(const Context* context) {
     }
   vkUnmapMemory(vkDevice, stagingBufferMemory);
 
-  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R, textureImageMemory_R, metal_tex_r);
+  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], textureImageMemory_R[which], metal_tex_r[which]);
 
-  transitionImageLayout(context, textureImage_R, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_R, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_R, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(context, stagingBuffer, textureImage_R[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
   vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
@@ -447,15 +447,15 @@ VkImageView createImageView(const Context* context, VkImage image, VkFormat form
   return imageView;
 }
 
-void Renderer::createTextureImageView_L(const Context* context) {
-    textureImageView_L = createImageView(context, textureImage_L, VK_FORMAT_R8G8B8A8_SRGB);
+void Renderer::createTextureImageView_L(const Context* context, int which) {
+    textureImageView_L[which] = createImageView(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB);
 }
 
-void Renderer::createTextureImageView_R(const Context* context) {
-    textureImageView_R = createImageView(context, textureImage_R, VK_FORMAT_R8G8B8A8_SRGB);
+void Renderer::createTextureImageView_R(const Context* context, int which) {
+    textureImageView_R[which] = createImageView(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB);
 }
 
-void Renderer::createTextureSampler_L(const Context* context) {
+void Renderer::createTextureSampler_L(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   VkPhysicalDeviceProperties properties{};
@@ -476,12 +476,12 @@ void Renderer::createTextureSampler_L(const Context* context) {
   samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
   samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_L) != VK_SUCCESS) {
+  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_L[which]) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
   }
 }
 
-void Renderer::createTextureSampler_R(const Context* context) {
+void Renderer::createTextureSampler_R(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   VkPhysicalDeviceProperties properties{};
@@ -502,17 +502,21 @@ void Renderer::createTextureSampler_R(const Context* context) {
   samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
   samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_R) != VK_SUCCESS) {
+  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_R[which]) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
   }
 }
 
-Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id tex_l, MTLTexture_id tex_r, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
+Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
-  metal_tex_l = tex_l;
-  metal_tex_r = tex_r;
+  metal_tex_l[0] = tex_l[0];
+  metal_tex_l[1] = tex_l[1];
+  metal_tex_l[2] = tex_l[2];
+  metal_tex_r[0] = tex_r[0];
+  metal_tex_r[1] = tex_r[1];
+  metal_tex_r[2] = tex_r[2];
   metal_tex_w = tex_w;
   metal_tex_h = tex_h;
 
@@ -527,14 +531,17 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
     return;
   }
 
-  createTextureImageHax_L(context);
-  createTextureImageView_L(context);
-  createTextureSampler_L(context);
+  for (int i = 0; i < 3; i++)
+  {
+    createTextureImageHax_L(context,i);
+    createTextureImageView_L(context,i);
+    createTextureSampler_L(context,i);
 
-  createTextureImageHax_R(context);
-  createTextureImageView_R(context);
-  createTextureSampler_R(context);
-
+    createTextureImageHax_R(context,i);
+    createTextureImageView_R(context,i);
+    createTextureSampler_R(context,i);
+  }
+  
   std::array<VkDescriptorPoolSize, 3> poolSizes{};
   poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   poolSizes[0].descriptorCount = static_cast<uint32_t>(numFramesInFlight);
@@ -604,7 +611,7 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
   renderProcesses.resize(numFramesInFlight);
   for (RenderProcess*& renderProcess : renderProcesses)
   {
-    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout, textureImageView_L, textureSampler_L, textureImageView_R, textureSampler_R);
+    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout, textureImageView_L[0], textureSampler_L[0], textureImageView_R[0], textureSampler_R[0]);
     if (!renderProcess->isValid())
     {
       valid = false;
@@ -732,16 +739,19 @@ Renderer::~Renderer()
 
   const VkDevice vkDevice = context->getVkDevice();
 
-  vkDestroySampler(vkDevice, textureSampler_L, nullptr);
-  vkDestroyImageView(vkDevice, textureImageView_L, nullptr);
-  vkDestroyImage(vkDevice, textureImage_L, nullptr);
-  vkFreeMemory(vkDevice, textureImageMemory_L, nullptr);
+  for (int i = 0; i < 3; i++)
+  {
+    vkDestroySampler(vkDevice, textureSampler_L[i], nullptr);
+    vkDestroyImageView(vkDevice, textureImageView_L[i], nullptr);
+    vkDestroyImage(vkDevice, textureImage_L[i], nullptr);
+    vkFreeMemory(vkDevice, textureImageMemory_L[i], nullptr);
 
-  vkDestroySampler(vkDevice, textureSampler_R, nullptr);
-  vkDestroyImageView(vkDevice, textureImageView_R, nullptr);
-  vkDestroyImage(vkDevice, textureImage_R, nullptr);
-  vkFreeMemory(vkDevice, textureImageMemory_R, nullptr);
-
+    vkDestroySampler(vkDevice, textureSampler_R[i], nullptr);
+    vkDestroyImageView(vkDevice, textureImageView_R[i], nullptr);
+    vkDestroyImage(vkDevice, textureImage_R[i], nullptr);
+    vkFreeMemory(vkDevice, textureImageMemory_R[i], nullptr);
+  }
+  
   vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
   vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
   vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
@@ -754,11 +764,12 @@ Renderer::~Renderer()
   vkDestroyCommandPool(vkDevice, commandPool, nullptr);
 }
 
-void Renderer::render(size_t swapchainImageIndex)
+void Renderer::render(size_t swapchainImageIndex, int which)
 {
   currentRenderProcessIndex = (currentRenderProcessIndex + 1u) % renderProcesses.size();
 
   RenderProcess* renderProcess = renderProcesses.at(currentRenderProcessIndex);
+  renderProcess->UpdateImages(textureImageView_L[which], textureSampler_L[which], textureImageView_R[which], textureSampler_R[which]);
 
   const VkFence busyFence = renderProcess->getBusyFence();
   if (vkResetFences(context->getVkDevice(), 1u, &busyFence) != VK_SUCCESS)

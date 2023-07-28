@@ -21,9 +21,9 @@
 
 uint32_t swapchainImageIndex;
 int frame_started = 0;
-std::mutex renderMutex;
-std::mutex renderMutex2;
-std::mutex dataMutex;
+std::mutex renderMutex[3];
+std::mutex renderMutex2[3];
+std::mutex dataMutex[3];
 
 extern "C"
 {
@@ -110,8 +110,8 @@ int libusb_test_main(void)
 }
 }
 
-MTLTexture_id g_tex_l;
-MTLTexture_id g_tex_r;
+MTLTexture_id* g_paTex_l;
+MTLTexture_id* g_paTex_r;
 uint32_t g_tex_w = 0;
 uint32_t g_tex_h = 0;
 Context* context = nullptr;
@@ -136,19 +136,6 @@ extern "C" int openxr_main()
   return 0;
 }
 
-extern "C" void render_loop()
-{
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  while (1)
-  {
-    openxr_pre_loop();
-    //openxr_loop();
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-}
-
-
 extern "C" int openxr_init()
 {
   setlinebuf(stdout);
@@ -158,7 +145,10 @@ extern "C" int openxr_init()
   //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
 
   frame_started = 0;
-  renderMutex2.lock();
+  for (int i = 0; i < 3; i++)
+  {
+    renderMutex2[i].lock();
+  }
 
   char tmp[1024];
   snprintf(tmp, sizeof(tmp), "%s/IOUSBLib_ios_hax.dylib", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
@@ -209,7 +199,7 @@ extern "C" int openxr_init()
 
   printf("XRHax: create Renderer!\n");
 
-  renderer = new Renderer(context, headset, g_tex_l, g_tex_r, g_tex_w, g_tex_h);
+  renderer = new Renderer(context, headset, g_paTex_l, g_paTex_r, g_tex_w, g_tex_h);
   if (!renderer || !renderer->isValid())
   {
     printf("XRHax: create Renderer failed!\n");
@@ -223,10 +213,10 @@ extern "C" int openxr_init()
   return EXIT_SUCCESS;
 }
 
-extern "C" int openxr_set_textures(MTLTexture_id tex_l, MTLTexture_id tex_r, uint32_t w, uint32_t h)
+extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, uint32_t w, uint32_t h)
 {
-  g_tex_l = tex_l;
-  g_tex_r = tex_r;
+  g_paTex_l = paTex_l;
+  g_paTex_r = paTex_r;
   g_tex_w = w;
   g_tex_h = h;
 
@@ -239,92 +229,18 @@ extern "C" int openxr_set_textures(MTLTexture_id tex_l, MTLTexture_id tex_r, uin
 
   if (!renderer) return 1;
 
-  renderer->metal_tex_l = g_tex_l;
-  renderer->metal_tex_r = g_tex_r;
+  renderer->metal_tex_l[0] = g_paTex_l[0];
+  renderer->metal_tex_l[1] = g_paTex_l[1];
+  renderer->metal_tex_l[2] = g_paTex_l[2];
+  renderer->metal_tex_r[0] = g_paTex_r[0];
+  renderer->metal_tex_r[1] = g_paTex_r[1];
+  renderer->metal_tex_r[2] = g_paTex_r[2];
   renderer->metal_tex_w = g_tex_w;
   renderer->metal_tex_h = g_tex_h;
   return 0;
 }
 
-extern "C" int openxr_pre_loop()
-{
-  //printf("XRHax: OpenXR loop start\n");
-  if (!context || !context->isValid()) {
-    if(openxr_init() != EXIT_SUCCESS) {
-      openxr_is_done = 1;
-      return 1;
-    }
-  }
-
-  // Main loop
-  if (headset->isExitRequested()) {
-    openxr_is_done = 1;
-    return 1;
-  }
-
-  if (frame_started) {
-    return 0;
-  }
-
-  const Headset::BeginFrameResult frameResult = headset->beginFrame(swapchainImageIndex);
-  if (frameResult == Headset::BeginFrameResult::Error)
-  {
-    openxr_is_done = 1;
-    return 1;
-  }
-
-  frame_started = 1;
-
-  return 0;
-}
-
-extern "C" int openxr_loop()
-{
-  if (!context || !context->isValid()) {
-    if(openxr_init() != EXIT_SUCCESS) {
-      openxr_is_done = 1;
-      return 1;
-    }
-  }
-
-  // Main loop
-  if (headset->isExitRequested()) {
-    openxr_is_done = 1;
-    return 1;
-  }
-
-  if (!frame_started) return 0;
-
-  static int throttle_prints = 0;
-  auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
-  long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-  if (++throttle_prints > 240) {
-    printf("%zu microseconds loop\n", (size_t)microseconds);
-    throttle_prints = 0;
-  }
-
-  last_loop = std::chrono::high_resolution_clock::now();
-
-  //else if (frameResult == Headset::BeginFrameResult::RenderFully)
-  {
-    renderer->render(swapchainImageIndex);
-    renderer->submit(false);
-  }
-
-  //if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
-  {
-    headset->endFrame();
-  }
-  //printf("XRHax: OpenXR loop done\n");
-
-  frame_started = 0;
-  
-
-  //context.sync(); // Sync before destroying so that resources are free
-  return 0;
-}
-
-extern "C" int openxr_full_loop()
+extern "C" int openxr_full_loop(int which)
 {
   uint32_t local_swapchainImageIndex = 0;
   if (!context || !context->isValid()) {
@@ -344,21 +260,26 @@ extern "C" int openxr_full_loop()
 
   //std::lock_guard<std::mutex> guard(renderMutex);
 
-  static int throttle_prints = 0;
-  auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
-  long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-  if (++throttle_prints > 240) {
-    printf("%zu microseconds loop\n", (size_t)microseconds);
-    throttle_prints = 0;
+  if (which == 0)
+  {
+    static int throttle_prints = 0;
+    auto elapsed = std::chrono::high_resolution_clock::now() - last_loop;
+    long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+    if (++throttle_prints > 30) 
+    {
+      printf("%zu microseconds loop\n", (size_t)microseconds / 3);
+      throttle_prints = 0;
+    }
+    last_loop = std::chrono::high_resolution_clock::now();
   }
-  last_loop = std::chrono::high_resolution_clock::now();
-
 
   const Headset::BeginFrameResult frameResult = headset->beginFrame(local_swapchainImageIndex);
-  dataMutex.unlock();
+  //printf("%u %x\n", which, local_swapchainImageIndex);
+  dataMutex[0].unlock();
   if (frameResult == Headset::BeginFrameResult::Error)
   {
-    openxr_is_done = 1;
+    //openxr_is_done = 1;
+    renderMutex[0].unlock();
     return 1;
   }
   else if (frameResult == Headset::BeginFrameResult::RenderFully)
@@ -366,13 +287,14 @@ extern "C" int openxr_full_loop()
     //printf("wait for frame...\n");
     for (int i = 0; i < 32; i++)
     {
-      if (renderMutex2.try_lock()) {
+      if (renderMutex2[0].try_lock()) 
+      {
         break;
       }
       //dataMutex.unlock();
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    renderer->render(local_swapchainImageIndex);
+    renderer->render(local_swapchainImageIndex, which);
     renderer->submit(false);
   }
 
@@ -382,47 +304,33 @@ extern "C" int openxr_full_loop()
   }
   //printf("XRHax: OpenXR loop done\n");
 
-  //context.sync(); // Sync before destroying so that resources are free
-  renderMutex.unlock();
+  //context->sync(); // Sync before destroying so that resources are free
+  renderMutex[0].unlock();
   //printf("releasing lock\n");
 
   return 0;
 }
 
-extern "C" int openxr_full_loop_thread()
+extern "C" void openxr_spawn_renderframe(int which)
 {
-  while(1)
-  {
-    openxr_full_loop();
-  }
-}
-
-static int thread_once = 0;
-
-extern "C" void openxr_spawn_renderframe()
-{
-  /*if (!thread_once) {
-    std::thread(openxr_full_loop_thread).detach();
-    thread_once = 1;
-  }*/
   for (int i = 0; i < 40; i++)
   {
-    if (renderMutex.try_lock()) {
+    if (renderMutex[0].try_lock()) {
       //printf("spawn render...\n");
-      std::thread(openxr_full_loop).detach();
+      std::thread(openxr_full_loop, which).detach();
       return;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  printf("couldn't spawn render...\n");
-  dataMutex.unlock();
+  printf("couldn't spawn render %u...\n", which);
+  dataMutex[0].unlock();
 }
 
-extern "C" void openxr_complete_renderframe()
+extern "C" void openxr_complete_renderframe(int which)
 {
   //printf("frame completed, unlocking\n");
-  renderMutex2.unlock();
+  renderMutex2[0].unlock();
 }
 
 extern "C" int openxr_done()
@@ -448,7 +356,7 @@ extern "C" int openxr_cleanup()
 float offset_x, offset_y, offset_z;
 bool offsets_set = false;
 
-extern "C" void openxr_headset_get_data(openxr_headset_data* out)
+extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
 {
   if (!out) return;
   out->view_l = NULL;
@@ -459,7 +367,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out)
   out->tangents_r = NULL;
   if (!headset) return;
 
-  dataMutex.lock();
+  dataMutex[0].lock();
 
   glm::mat4 ctrl_l = util::poseToMatrix(headset->tracked_locations[0].pose);
   glm::mat4 ctrl_r = util::poseToMatrix(headset->tracked_locations[1].pose);

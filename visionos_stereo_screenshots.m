@@ -63,17 +63,36 @@ struct RSSimulatedHeadsetPose {
   simd_float4 rotation;
 };
 
+/*
+typedef struct cp_time {
+  uint64_t cp_mach_abs_time;
+} cp_time;
+*/
+
+static id<MTLTexture> gOrigTextureList[3] = {nil,nil,nil};
+
 // TODO(zhuowei): multiple screenshots in flight
-static cp_drawable_t gHookedDrawable;
+static cp_drawable_t gHookedDrawable[3] = {nil,nil,nil};;
 
-static id<MTLTexture> gHookedRightTexture = nil;
-static id<MTLTexture> gHookedRightDepthTexture = nil;
-static id<MTLTexture> gHookedLeftTexture = nil;
-static id<MTLTexture> gHookedLeftDepthTexture = nil;
+static id<MTLTexture> gHookedRightTexture[3] = {nil,nil,nil};
+static id<MTLTexture> gHookedRightDepthTexture[3] = {nil,nil,nil};
+static id<MTLTexture> gHookedLeftTexture[3] = {nil,nil,nil};
+static id<MTLTexture> gHookedLeftDepthTexture[3] = {nil,nil,nil};
 
-static id<MTLTexture> gHookedSimulatorPreviewTexture = nil;
+static id<MTLTexture> gHookedSimulatorPreviewTexture[3] = {nil,nil,nil};
 
 #define NUM_VIEWS (2)
+
+@interface RSSimulatedHeadset
+- (void)getEyePose:(struct RSSimulatedHeadsetPose*)pose:(int)forEye;
+- (void)setEyePose:(struct RSSimulatedHeadsetPose)pose:(int)forEye;
+- (void)setHMDPose:(struct RSSimulatedHeadsetPose)pose;
+@end
+
+RSSimulatedHeadset* gHookedSimulatedHeadset = nil;
+SEL gHookedSimulatedHeadset_sel;
+static void (*real_RSSimulatedHeadset_setHMDPose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose pose);
 
 void cp_drawable_set_pose(cp_drawable_t,simd_float4x4);
 void cp_drawable_set_simd_pose(cp_drawable_t,simd_float4x4);
@@ -135,22 +154,42 @@ static void hook_RETransformComponentSetWorldMatrix4x4F(simd_float4x4 a)
 }
 DYLD_INTERPOSE(hook_RETransformComponentSetWorldMatrix4x4F, RETransformComponentSetWorldMatrix4x4F);
 
-static cp_time_t hook_cp_frame_timing_get_presentation_time(void* a)
+#if 0
+static void* hook_cp_frame_predict_timing(void* a)
+{
+  return cp_frame_predict_timing(a);
+}
+
+static struct cp_time hook_cp_frame_timing_get_presentation_time(void* a)
 {
   // +0x68 double 0.008333 (120Hz)
   // +0x28 frame idx
   //printf("testing %f\n", *(double*)((intptr_t)a + 0x68));
   //printf("testing %d\n", *(int*)((intptr_t)a + 0x28));
 
+  //struct cp_time val = {mach_absolute_time()};
+  //return val;
+
   return cp_frame_timing_get_presentation_time(a);
 }
 DYLD_INTERPOSE(hook_cp_frame_timing_get_presentation_time, cp_frame_timing_get_presentation_time);
 
-static cp_time_t hook_cp_frame_timing_get_rendering_deadline(void* a)
+static struct cp_time hook_cp_frame_timing_get_rendering_deadline(void* a)
 {
+  //struct cp_time val = {mach_absolute_time()};
+  //return val;
+
   return cp_frame_timing_get_rendering_deadline(a);
 }
 DYLD_INTERPOSE(hook_cp_frame_timing_get_rendering_deadline, cp_frame_timing_get_rendering_deadline);
+
+extern int cp_frame_timing_get_frame_repeat_count(void* a);
+static int hook_cp_frame_timing_get_frame_repeat_count(void* a)
+{
+  return 0;
+}
+DYLD_INTERPOSE(hook_cp_frame_timing_get_frame_repeat_count, cp_frame_timing_get_frame_repeat_count);
+#endif
 
 #if 0
 void RERenderManagerWaitForFramePacing(void* ctx);
@@ -168,22 +207,74 @@ static int hook_cp_layer_get_state(void* a)
 }
 DYLD_INTERPOSE(hook_cp_layer_get_state, cp_layer_get_state);
 
+int num_buffers_collected()
+{
+  int ret = 0;
+  for (int i = 0; i < 3; i++)
+  {
+    if (gOrigTextureList[i]) {
+      ret++;
+    }
+  }
+  return ret;
+}
+
+int which_buffer_is_this(id<MTLTexture> originalTexture)
+{
+  if (!originalTexture) return -1;
+
+  for (int i = 0; i < 3; i++)
+  {
+    if (gOrigTextureList[i] == originalTexture) {
+      return i;
+    }
+  }
+
+  for (int i = 0; i < 3; i++)
+  {
+    if (gOrigTextureList[i] == nil) {
+      gOrigTextureList[i] = originalTexture;
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+static int last_which = -1;
+
 static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
+  int which_guess = (last_which + 1) % 3;
+  // We do this first, because query_drawable might stall...?
+  openxr_headset_data xr_data;
+  memset(&xr_data, 0, sizeof(xr_data));
+  if (num_buffers_collected() >= 3)
+  {
+    openxr_set_textures(&gHookedLeftTexture, &gHookedRightTexture, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
+
+    openxr_spawn_renderframe(which_guess);
+
+    // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
+    openxr_headset_get_data(&xr_data, which_guess);
+  }
+
   cp_drawable_t retval = cp_frame_query_drawable(frame);
-  gHookedDrawable = nil;
-  if (!gHookedRightTexture) {
+  int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
+  last_which = which;
+  if (!gHookedRightTexture[which]) {
     // only make this once
     id<MTLDevice> metalDevice = MTLCreateSystemDefaultDevice();
     id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
     id<MTLTexture> originalDepthTexture = cp_drawable_get_depth_texture(retval, 0);
-    gHookedRightTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
-    gHookedRightDepthTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
-    gHookedLeftTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
-    gHookedLeftDepthTexture = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
+    
+    gHookedRightTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    gHookedRightDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
+    gHookedLeftTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    gHookedLeftDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
   }
 
-  gHookedDrawable = retval;
-  gHookedSimulatorPreviewTexture = cp_drawable_get_color_texture(retval, 0);
+  gHookedDrawable[which] = retval;
+  gHookedSimulatorPreviewTexture[which] = cp_drawable_get_color_texture(retval, 0);
 
   cp_view_t simView = cp_drawable_get_view(retval, 0);
   cp_view_t rightView = cp_drawable_get_view(retval, 1);
@@ -191,14 +282,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
   cp_view_get_view_texture_map(rightView)->texture_index = 1;
   cp_view_get_view_texture_map(simView)->texture_index = 2; // HACK: move the sim view to the left eye texture index
-
-  openxr_set_textures(gHookedLeftTexture, gHookedRightTexture, gHookedRightTexture.width, gHookedRightTexture.height);
-
-  openxr_spawn_renderframe();
-
-  // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
-  openxr_headset_data xr_data;
-  openxr_headset_get_data(&xr_data);
 
   // Apple
   // X is -left/+right
@@ -304,25 +387,47 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   left_eye_zbasis[2] = view_mat_l.columns[2][2];
   left_eye_zbasis[3] = view_mat_l.columns[2][3];
 
+  if (gHookedSimulatedHeadset) {
+    struct RSSimulatedHeadsetPose pose;
+    pose.position = left_eye_pos;
+    pose.rotation = left_eye_quat;
+
+    real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
+  }
+
   return retval;
 }
 
 DYLD_INTERPOSE(hook_cp_frame_query_drawable, cp_frame_query_drawable);
 
+#if 0
+extern void* RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c);
+void* hook_RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c)
+{
+  return NULL;
+}
+DYLD_INTERPOSE(hook_RERenderFrameSettingsAddGpuWaitEvent, RERenderFrameSettingsAddGpuWaitEvent);
+#endif
+
+extern void cp_drawable_present(cp_drawable_t drawable);
+
 static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
-  if (gHookedDrawable == drawable) {
+  int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
+  //printf("%u\n", which);
+  if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3) {
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      openxr_complete_renderframe();
+      openxr_complete_renderframe(which);
     }];
   }
 
   id<MTLBlitCommandEncoder> blit = [command_buffer blitCommandEncoder];
-  [blit copyFromTexture:gHookedLeftTexture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture.width, gHookedLeftTexture.height, 1) toTexture:gHookedSimulatorPreviewTexture destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
-  [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture];
+  [blit copyFromTexture:gHookedLeftTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture[which].width, gHookedLeftTexture[which].height, 1) toTexture:gHookedSimulatorPreviewTexture[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
+  [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture[which]];
   [blit endEncoding];
 
   cp_drawable_encode_present(drawable, command_buffer);
+  //cp_drawable_present(drawable);
 }
 
 DYLD_INTERPOSE(hook_cp_drawable_encode_present, cp_drawable_encode_present);
@@ -386,11 +491,12 @@ static size_t hook_cp_drawable_get_texture_count(cp_drawable_t drawable) { retur
 DYLD_INTERPOSE(hook_cp_drawable_get_texture_count, cp_drawable_get_texture_count);
 
 static id<MTLTexture> hook_cp_drawable_get_color_texture(cp_drawable_t drawable, size_t index) {
+  int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
   if (index == 1) {
-    return gHookedRightTexture;
+    return gHookedRightTexture[which];
   }
   else if (index == 2) {
-    return gHookedLeftTexture;
+    return gHookedLeftTexture[which];
   }
   return cp_drawable_get_color_texture(drawable, 0);
 }
@@ -398,11 +504,12 @@ static id<MTLTexture> hook_cp_drawable_get_color_texture(cp_drawable_t drawable,
 DYLD_INTERPOSE(hook_cp_drawable_get_color_texture, cp_drawable_get_color_texture);
 
 static id<MTLTexture> hook_cp_drawable_get_depth_texture(cp_drawable_t drawable, size_t index) {
+  int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
   if (index == 1) {
-    return gHookedRightDepthTexture;
+    return gHookedRightDepthTexture[which];
   }
   else if (index == 2) {
-    return gHookedLeftDepthTexture;
+    return gHookedLeftDepthTexture[which];
   }
   return cp_drawable_get_depth_texture(drawable, 0);
 }
@@ -462,7 +569,7 @@ static double hook_RSUserSettings_worstAllowedFrameTime(void* self, double val) 
 }
 #endif
 
-#if 1
+#if 0
 static int (*real_RSXRRenderLoop_currentFrequency)(void* self);
 static int hook_RSXRRenderLoop_currentFrequency(void* self) {
   int ret = real_RSXRRenderLoop_currentFrequency(self);
@@ -492,11 +599,19 @@ static int hook_RSXRRenderLoop_currentFrequency(void* self) {
 }
 #endif
 
-@interface RSSimulatedHeadset
-- (void)getEyePose:(struct RSSimulatedHeadsetPose*)pose:(int)forEye;
-- (void)setEyePose:(struct RSSimulatedHeadsetPose)pose:(int)forEye;
-- (void)setHMDPose:(struct RSSimulatedHeadsetPose)pose;
-@end
+extern int os_workgroup_interval_start(os_workgroup_interval_t wg, uint64_t start, uint64_t deadline, os_workgroup_interval_data_t data);
+static int hook_os_workgroup_interval_start(os_workgroup_interval_t wg, uint64_t start, uint64_t deadline, os_workgroup_interval_data_t data)
+{
+  return os_workgroup_interval_start(wg, start, deadline, data);
+}
+DYLD_INTERPOSE(hook_os_workgroup_interval_start, os_workgroup_interval_start);
+
+extern int os_signpost_enabled(void* a);
+static int hook_os_signpost_enabled(void* a)
+{
+  return 1;
+}
+DYLD_INTERPOSE(hook_os_signpost_enabled, os_signpost_enabled);
 
 static void (*real_RSSimulatedHeadset_getEyePose)(RSSimulatedHeadset* self, SEL sel,
                                                   struct RSSimulatedHeadsetPose* pose, int forEye);
@@ -527,7 +642,7 @@ static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL 
                                                   struct RSSimulatedHeadsetPose pose, int forEye);
 static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose, int forEye) {
-  /*if (forEye == 0)
+  if (forEye == 0)
   {
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
@@ -536,7 +651,7 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose.position = right_eye_pos;
     pose.rotation = right_eye_quat;
-  }*/
+  }
   /*else if (forEye == 2)
   {
     pose.position = left_eye_pos;
@@ -548,13 +663,15 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
   //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
 }
 
-static void (*real_RSSimulatedHeadset_setHMDPose)(RSSimulatedHeadset* self, SEL sel,
-                                                  struct RSSimulatedHeadsetPose pose);
+
 static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose) {
 
   pose.position = left_eye_pos;
   pose.rotation = left_eye_quat;
+
+  gHookedSimulatedHeadset = self;
+  gHookedSimulatedHeadset_sel = sel;
 
   real_RSSimulatedHeadset_setHMDPose(self, sel, pose);
   
@@ -605,7 +722,7 @@ __attribute__((constructor)) static void SetupSignalHandler() {
     method_setImplementation(method, (IMP)hook_RSSimulatedHeadset_setHMDPose);
   }
 
-#if 1
+#if 0
   {
     Class cls = NSClassFromString(@"RSXRRenderLoop");
     Method method = class_getInstanceMethod(cls, @selector(currentFrequency));

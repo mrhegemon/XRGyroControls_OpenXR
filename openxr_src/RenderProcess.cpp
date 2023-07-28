@@ -85,6 +85,14 @@ RenderProcess::RenderProcess(VkDevice device,
     return;
   }
 
+  this->UpdateImages(textureImageView, textureSampler, textureImageView2, textureSampler2);
+}
+
+void RenderProcess::UpdateImages(VkImageView textureImageView,
+                             VkSampler textureSampler,
+                             VkImageView textureImageView2,
+                             VkSampler textureSampler2)
+{
   // Associate the descriptor set with the uniform buffer
   VkDescriptorBufferInfo descriptorBufferInfo;
   descriptorBufferInfo.buffer = uniformBuffer->getVkBuffer();
