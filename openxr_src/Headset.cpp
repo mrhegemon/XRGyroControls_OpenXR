@@ -860,16 +860,6 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  // Wait for the swapchain image
-  XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
-  swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
-  result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
-  if (XR_FAILED(result))
-  {
-    util::error(Error::GenericOpenXR);
-    return BeginFrameResult::Error;
-  }
-
   for (int i = 0; i < 64; i++) {
     tracked_locations[i].pose.position = {0.0, 0.0, 0.0};
     tracked_locations[i].pose.orientation = {0.0, 0.0, 0.0, 1.0};
@@ -1091,6 +1081,19 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   r_eye_mat = r_view_no_rot * r_eye_mat;
 
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
+}
+
+void Headset::beginFrameRender()
+{
+  // Wait for the swapchain image
+  XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+  swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
+  XrResult result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
+  if (XR_FAILED(result))
+  {
+    util::error(Error::GenericOpenXR);
+    return;// BeginFrameResult::Error;
+  }
 }
 
 void Headset::endFrame() const

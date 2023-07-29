@@ -15,11 +15,11 @@ class Renderer final
 {
 public:
   Renderer();
-  Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, uint32_t tex_w, uint32_t tex_h);
+  Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, MTLSharedEvent_id* event_l, uint32_t tex_w, uint32_t tex_h);
   ~Renderer();
 
   void render(size_t swapchainImageIndex, int which);
-  void submit(bool useSemaphores) const;
+  void submit(bool useSemaphores, int which) const;
 
   bool isValid() const;
   VkCommandBuffer getCurrentCommandBuffer() const;
@@ -36,6 +36,9 @@ public:
 
   MTLTexture_id metal_tex_l[3];
   MTLTexture_id metal_tex_r[3];
+  MTLSharedEvent_id metal_event_l[3];
+  //VkSemaphore metalTexEvent[3];
+  VkEvent metalTexEvent[3];
   uint32_t metal_tex_w;
   uint32_t metal_tex_h;
 

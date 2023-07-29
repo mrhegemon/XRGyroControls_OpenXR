@@ -145,135 +145,28 @@ void createImageFromMetal(const Context* context, uint32_t width, uint32_t heigh
   }
 }
 
-VkCommandBuffer Renderer::beginSingleTimeCommands(const Context* context) {
-    const VkDevice device = context->getVkDevice();
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-}
-
-void Renderer::endSingleTimeCommands(const Context* context, VkCommandBuffer commandBuffer) {
-  const VkDevice device = context->getVkDevice();
-
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(context->getVkDrawQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(context->getVkDrawQueue());
-
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
-}
-
-void Renderer::transitionImageLayout(const Context* context, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-    const VkDevice device = context->getVkDevice();
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(context);
-
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    } else {
-        throw std::invalid_argument("unsupported layout transition!");
-    }
-
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        sourceStage, destinationStage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
-
-    endSingleTimeCommands(context, commandBuffer);
-}
-
-void Renderer::copyBufferToImage(const Context* context, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(context);
-
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {
-        width,
-        height,
-        1
-    };
-
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    endSingleTimeCommands(context, commandBuffer);
-}
-
 void Renderer::createTextureImageHax_L(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
-  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], metal_tex_l[which]);
+  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], metal_tex_l[which]);
 }
 
 void Renderer::createTextureImageHax_R(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
-  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], metal_tex_r[which]);
+  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], metal_tex_r[which]);
 }
 
-Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
+Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, MTLSharedEvent_id* event_l, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
-  metal_tex_l[0] = tex_l[0];
-  metal_tex_l[1] = tex_l[1];
-  metal_tex_l[2] = tex_l[2];
-  metal_tex_r[0] = tex_r[0];
-  metal_tex_r[1] = tex_r[1];
-  metal_tex_r[2] = tex_r[2];
+  for (int i = 0; i < 3; i++)
+  {
+    metal_tex_l[i] = tex_l[i];
+    metal_tex_r[i] = tex_r[i];
+    metal_event_l[i] = event_l[i];
+  }
   metal_tex_w = tex_w;
   metal_tex_h = tex_h;
 
@@ -293,6 +186,23 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
     createTextureImageHax_L(context,i);
 
     createTextureImageHax_R(context,i);
+
+    VkImportMetalSharedEventInfoEXT metalEventInfo = {};
+    metalEventInfo.sType = VK_STRUCTURE_TYPE_IMPORT_METAL_SHARED_EVENT_INFO_EXT;
+    metalEventInfo.pNext = NULL;
+    metalEventInfo.mtlSharedEvent = metal_event_l[i];
+
+    // Now create an event and wait for it on the GPU
+    VkEventCreateInfo eventInfo = {};
+    eventInfo.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
+    eventInfo.pNext = &metalEventInfo;
+    eventInfo.flags = 0;
+    vkCreateEvent(vkDevice, &eventInfo, NULL, &metalTexEvent[i]);
+
+    /*VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreInfo.pNext = &metalEventInfo;
+    vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &metalTexEvent[i]);*/
   }
 
   // Create a render process for each frame in flight
@@ -398,13 +308,16 @@ void Renderer::render(size_t swapchainImageIndex, int which)
   region_r.dstOffsets[1].y = headset->getRenderTarget(swapchainImageIndex)->h;
   region_r.dstOffsets[1].z = 1;
 
+  /*vkCmdWaitEvents(commandBuffer, 1, &metalTexEvent[which], VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, nullptr, 0, nullptr,
+                    0, nullptr);*/
+
   vkCmdBlitImage(commandBuffer, textureImage_L[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    1, &region_l, VK_FILTER_LINEAR);
   vkCmdBlitImage(commandBuffer, textureImage_R[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    1, &region_r, VK_FILTER_LINEAR);
 }
 
-void Renderer::submit(bool useSemaphores) const
+void Renderer::submit(bool useSemaphores, int which) const
 {
   const RenderProcess* renderProcess = renderProcesses.at(currentRenderProcessIndex);
   const VkCommandBuffer commandBuffer = renderProcess->getCommandBuffer();
@@ -413,7 +326,7 @@ void Renderer::submit(bool useSemaphores) const
     return;
   }
 
-  const VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  const VkPipelineStageFlags waitStages = { 0xFFFFFFFF };
   const VkSemaphore drawableSemaphore = renderProcess->getDrawableSemaphore();
   const VkSemaphore presentableSemaphore = renderProcess->getPresentableSemaphore();
   const VkFence busyFence = renderProcess->getBusyFence();
@@ -422,6 +335,9 @@ void Renderer::submit(bool useSemaphores) const
   submitInfo.pWaitDstStageMask = &waitStages;
   submitInfo.commandBufferCount = 1u;
   submitInfo.pCommandBuffers = &commandBuffer;
+
+  //submitInfo.waitSemaphoreCount = 1u;
+  //submitInfo.pWaitSemaphores = &metalTexEvent[which];
 
   if (useSemaphores)
   {

@@ -34,6 +34,7 @@ public:
     SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
+  void beginFrameRender();
   void endFrame() const;
 
   bool isValid() const;

@@ -113,6 +113,8 @@ static id<MTLTexture> gHookedRightTextureCopy[3] = {nil,nil,nil};
 static id<MTLTexture> gHookedLeftTextureCopy[3] = {nil,nil,nil};
 
 static id<MTLTexture> gHookedSimulatorPreviewTexture[3] = {nil,nil,nil};
+static id<MTLSharedEvent> copyDoneL[3] = {nil,nil,nil};
+static MTLSharedEventListener* copyDoneListenerL[3];
 
 #define NUM_VIEWS (2)
 
@@ -142,7 +144,7 @@ static id<MTLTexture> MakeOurTextureBasedOnTheirTexture(id<MTLDevice> device,
                                                          width:originalTexture.width
                                                         height:originalTexture.height
                                                      mipmapped:false];
-  descriptor.storageMode = MTLStorageModeMemoryless;//originalTexture.storageMode;
+  descriptor.resourceOptions = originalTexture.resourceOptions;
   return [device newTextureWithDescriptor:descriptor];
 }
 
@@ -275,7 +277,7 @@ void pull_openxr_data()
 {
   int which_guess = (last_which + 1) % 3;
 
-  printf("pull_openxr_data %u (%u)\n", which_guess, pulled_which == which_guess);
+  //printf("pull_openxr_data %u (%u)\n", which_guess, pulled_which == which_guess);
 
   if (pulled_which == which_guess) {
     return;
@@ -285,7 +287,7 @@ void pull_openxr_data()
   memset(&xr_data, 0, sizeof(xr_data));
   if (num_buffers_collected() >= 3)
   {
-    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, gHookedRightTextureCopy[0].width, gHookedRightTextureCopy[0].height);
+    openxr_set_textures(&gHookedLeftTexture, &gHookedRightTexture, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
 
     openxr_spawn_renderframe(which_guess);
 
@@ -372,7 +374,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
-  printf("hook_cp_frame_query_drawable %u\n", which);
+  //printf("hook_cp_frame_query_drawable %u\n", which);
   if (!gHookedRightTexture[which]) {
     // only make this once
     id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
@@ -386,6 +388,11 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
     gHookedRightTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
     gHookedLeftTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
+    copyDoneL[which] = [metalDevice newSharedEvent];
+
+    // Shareable event listener
+    dispatch_queue_t myQueue = dispatch_queue_create("com.example.apple-samplecode.MyQueue", NULL);
+    copyDoneListenerL[which] = [[MTLSharedEventListener alloc] initWithDispatchQueue:myQueue];
   }
 
   gHookedDrawable[which] = retval;
@@ -443,6 +450,24 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
 DYLD_INTERPOSE(hook_cp_frame_query_drawable, cp_frame_query_drawable);
 
+extern void RERenderFrameWorkloadCommitAndWait(void* a);
+extern void RERenderFrameWorkloadCommit(void* a);
+
+void hook_RERenderFrameWorkloadCommitAndWait(void* a)
+{
+  RERenderFrameWorkloadCommitAndWait(a);
+  //openxr_complete_renderframe(last_which);
+}
+
+void hook_RERenderFrameWorkloadCommit(void* a)
+{
+  RERenderFrameWorkloadCommitAndWait(a);
+  //openxr_complete_renderframe(last_which);
+}
+
+DYLD_INTERPOSE(hook_RERenderFrameWorkloadCommitAndWait, RERenderFrameWorkloadCommitAndWait);
+DYLD_INTERPOSE(hook_RERenderFrameWorkloadCommit, RERenderFrameWorkloadCommit);
+
 #if 0
 extern void* RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c);
 void* hook_RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c)
@@ -453,50 +478,112 @@ DYLD_INTERPOSE(hook_RERenderFrameSettingsAddGpuWaitEvent, RERenderFrameSettingsA
 #endif
 
 extern void cp_drawable_present(cp_drawable_t drawable);
-
+static int buffer_delay = 0;
 static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
   last_which = which;
-  if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3) {
-    id<MTLCommandQueue> queue = command_buffer.commandQueue;
-    id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
+  if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3 && buffer_delay >= 1) {
+    //id<MTLCommandQueue> queue = command_buffer.commandQueue;
+    //id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
 
-    printf("hook_cp_drawable_encode_present %u\n", which);
+    //printf("hook_cp_drawable_encode_present %u\n", which);
 
-    id<MTLBlitCommandEncoder> blit = [blit_cmd_buffer blitCommandEncoder];
+#if 0
+    // Optimize the texture for CPU access by encoding a blit command.
+    id <MTLBlitCommandEncoder> haxEncoderL = [command_buffer blitCommandEncoder];
+    [haxEncoderL optimizeContentsForCPUAccess:gHookedLeftTexture[which]];
+    [haxEncoderL endEncoding];
+
+    // Optimize the texture for CPU access by encoding a blit command.
+    id <MTLBlitCommandEncoder> haxEncoderR = [command_buffer blitCommandEncoder];
+    [haxEncoderR optimizeContentsForCPUAccess:gHookedRightTexture[which]];
+    [haxEncoderR endEncoding];
+
+    id <MTLBlitCommandEncoder> haxEncoderL2 = [command_buffer blitCommandEncoder];
+    [haxEncoderL2 optimizeContentsForGPUAccess:gHookedLeftTexture[which]];
+    [haxEncoderL2 endEncoding];
+
+    // Optimize the texture for CPU access by encoding a blit command.
+    id <MTLBlitCommandEncoder> haxEncoderR2 = [command_buffer blitCommandEncoder];
+    [haxEncoderR2 optimizeContentsForGPUAccess:gHookedRightTexture[which]];
+    [haxEncoderR2 endEncoding];
+#endif
+
+    //[command_buffer encodeWaitForEvent:copyDoneL[which] value:0];
+
+    //[command_buffer encodeSignalEvent:copyDoneL[which] value:1];
+
+    id<MTLBlitCommandEncoder> blit = [command_buffer blitCommandEncoder];
     [blit copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
+    //[blit updateFence:copyDoneL[which]];
     [blit endEncoding];
 
-    /*id<MTLBlitCommandEncoder> blit2 = [blit_cmd_buffer blitCommandEncoder];
+    /*id<MTLBlitCommandEncoder> blit2 = [command_buffer blitCommandEncoder];
     [blit2 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
     [blit2 endEncoding];
 
-    id<MTLBlitCommandEncoder> blit3 = [blit_cmd_buffer blitCommandEncoder];
+    id<MTLBlitCommandEncoder> blit3 = [command_buffer blitCommandEncoder];
     [blit3 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
     [blit3 endEncoding];*/
 
+#if 0
     //if (which == 1)
     {
-      id<MTLBlitCommandEncoder> blitL = [blit_cmd_buffer blitCommandEncoder];
+      id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
       [blitL copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedLeftTextureCopy[which]];
       [blitL endEncoding];
 
-      id<MTLBlitCommandEncoder> blitR = [blit_cmd_buffer blitCommandEncoder];
+      id<MTLBlitCommandEncoder> blitR = [command_buffer blitCommandEncoder];
       [blitR copyFromTexture:gHookedRightTexture[which] toTexture:gHookedRightTextureCopy[which]];
       [blitR endEncoding];
     }
-    
+#endif
 
-    [blit_cmd_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      openxr_complete_renderframe(which);
+    //[command_buffer encodeSignalEvent:copyDoneL[which] value:copyDoneL[which].signaledValue + 1];
+
+    /*
+    [copyDoneL[which] notifyListener:copyDoneListenerL[which]
+                         atValue:0
+                           block:^(id<MTLSharedEvent> sharedEvent, uint64_t value) {
+        /* Do CPU work * /
+        //sharedEvent.signaledValue += 1;
+        printf("got signal for %u %u\n", which, haredEvent.signaledValue);
+        openxr_complete_renderframe(which);
     }];
+    */
 
   
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      [blit_cmd_buffer commit];
+      copyDoneL[which].signaledValue += 1;
+      //printf("got signal for %u %u\n", which, copyDoneL[which].signaledValue);
+      /*
+      size_t textureDataSize = gHookedLeftTexture[which].width * 4;
+      NSMutableData* outputData = [NSMutableData dataWithLength:textureDataSize];
+      [gHookedLeftTexture[which]
+               getBytes:outputData.mutableBytes
+            bytesPerRow:gHookedLeftTexture[which].width * 4
+          bytesPerImage:textureDataSize
+             fromRegion:MTLRegionMake2D(0, 0, gHookedLeftTexture[which].width, 1)
+            mipmapLevel:0
+                  slice:0];
+
+      NSMutableData* outputData2 = [NSMutableData dataWithLength:textureDataSize];
+      [gHookedRightTexture[which]
+               getBytes:outputData2.mutableBytes
+            bytesPerRow:gHookedRightTexture[which].width * 4
+          bytesPerImage:textureDataSize
+             fromRegion:MTLRegionMake2D(0, 0, gHookedRightTexture[which].width, 1)
+            mipmapLevel:0
+                  slice:0];*/
+
+      //[blit_cmd_buffer commit];
+      openxr_complete_renderframe(which);
     }];
   }
+
+  if (num_buffers_collected() >= 3 )
+    buffer_delay = 1;
 
   cp_drawable_encode_present(drawable, command_buffer);
 
@@ -540,7 +627,7 @@ DYLD_INTERPOSE(hook_cp_drawable_get_texture_count, cp_drawable_get_texture_count
 
 static id<MTLTexture> hook_cp_drawable_get_color_texture(cp_drawable_t drawable, size_t index) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
-  printf("hook_cp_drawable_get_color_texture(%u) %u\n", index, which);
+  //printf("hook_cp_drawable_get_color_texture(%u) %u\n", index, which);
   if (index == 1) {
     return gHookedRightTexture[which];
   }
@@ -554,7 +641,7 @@ DYLD_INTERPOSE(hook_cp_drawable_get_color_texture, cp_drawable_get_color_texture
 
 static id<MTLTexture> hook_cp_drawable_get_depth_texture(cp_drawable_t drawable, size_t index) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
-  printf("hook_cp_drawable_get_depth_texture(%u) %u\n", index, which);
+  //printf("hook_cp_drawable_get_depth_texture(%u) %u\n", index, which);
   if (index == 1) {
     return gHookedRightDepthTexture[which];
   }
