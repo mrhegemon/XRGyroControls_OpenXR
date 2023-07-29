@@ -461,7 +461,7 @@ void hook_RERenderFrameWorkloadCommitAndWait(void* a)
 
 void hook_RERenderFrameWorkloadCommit(void* a)
 {
-  RERenderFrameWorkloadCommitAndWait(a);
+  RERenderFrameWorkloadCommit(a);
   //openxr_complete_renderframe(last_which);
 }
 

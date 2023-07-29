@@ -247,6 +247,8 @@ extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_
 
 uint32_t swapchainImageIndex[3] = {0,0,0};
 
+int todoPoseIdx = 0;
+
 extern "C" int openxr_full_loop(int which)
 {
   if (!context || !context->isValid()) {
@@ -279,7 +281,7 @@ extern "C" int openxr_full_loop(int which)
     last_loop = std::chrono::high_resolution_clock::now();
   }
 
-  const Headset::BeginFrameResult frameResult = headset->beginFrame(swapchainImageIndex[which]);
+  const Headset::BeginFrameResult frameResult = headset->beginFrame(&todoPoseIdx);
   //printf("%u %x\n", which, swapchainImageIndex[which]);
   dataMutex[which].unlock();
   if (frameResult == Headset::BeginFrameResult::Error)
@@ -291,6 +293,7 @@ extern "C" int openxr_full_loop(int which)
   }
   else if (frameResult == Headset::BeginFrameResult::RenderFully)
   {
+    headset->beginFrameRender(swapchainImageIndex[which]);
     renderer->render(swapchainImageIndex[which], which);
     //printf("wait for frame...\n");
 #if 0
@@ -308,7 +311,6 @@ extern "C" int openxr_full_loop(int which)
     //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     //renderer->render(swapchainImageIndex[which], which);
     //printf("submit %u\n", which);
-    headset->beginFrameRender();
     renderer->submit(false, which);
   }
   else {
@@ -389,13 +391,15 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
 
   dataMutex[which].lock();
 
-  glm::mat4 ctrl_l = util::poseToMatrix(headset->tracked_locations[0].pose);
-  glm::mat4 ctrl_r = util::poseToMatrix(headset->tracked_locations[1].pose);
+  PoseData* pPose = &headset->storedPoses[todoPoseIdx];
 
-  //std::lock_guard<std::mutex> guard(headset->eyePoseMutex);
+  glm::mat4 ctrl_l = util::poseToMatrix(pPose->tracked_locations[0].pose);
+  glm::mat4 ctrl_r = util::poseToMatrix(pPose->tracked_locations[1].pose);
 
-  const XrView& eyePose0 = headset->eyePoses.at(0);
-  const XrView& eyePose1 = headset->eyePoses.at(1);
+  //std::lock_guard<std::mutex> guard(pPose->eyePoseMutex);
+
+  const XrView& eyePose0 = pPose->eyePoses.at(0);
+  const XrView& eyePose1 = pPose->eyePoses.at(1);
 
   if (!offsets_set) {
     offset_x = eyePose0.pose.position.x;
@@ -405,7 +409,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
     offsets_set = true;
   }
 
-  if (headset->grab_value[0].currentState > 0.5) {
+  if (pPose->grab_value[0].currentState > 0.5) {
       offset_y = 2.22;
       printf("Down!\n");
   }
@@ -430,12 +434,12 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
   out->r_qz = eyePose1.pose.orientation.z;
   out->r_qw = eyePose1.pose.orientation.w;
 
-  out->view_l = glm::value_ptr(headset->eyeViewMatrices.at(0));
-  out->view_r = glm::value_ptr(headset->eyeViewMatrices.at(1));
-  out->proj_l = glm::value_ptr(headset->eyeProjectionMatrices.at(0));
-  out->proj_r = glm::value_ptr(headset->eyeProjectionMatrices.at(1));
-  out->tangents_l = headset->eyeTangents_l;
-  out->tangents_r = headset->eyeTangents_r;
+  out->view_l = glm::value_ptr(pPose->eyeViewMatrices.at(0));
+  out->view_r = glm::value_ptr(pPose->eyeViewMatrices.at(1));
+  out->proj_l = glm::value_ptr(pPose->eyeProjectionMatrices.at(0));
+  out->proj_r = glm::value_ptr(pPose->eyeProjectionMatrices.at(1));
+  out->tangents_l = pPose->eyeTangents_l;
+  out->tangents_r = pPose->eyeTangents_r;
 
   out->view_l[12] = out->l_x;
   out->view_l[13] = out->l_y;
@@ -444,7 +448,7 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
   out->view_r[13] = out->r_y;
   out->view_r[14] = out->r_z;
 
-  glm::mat4 view_r_rel = glm::inverse(headset->eyeViewMatrices.at(0)) * headset->eyeViewMatrices.at(1);
+  glm::mat4 view_r_rel = glm::inverse(pPose->eyeViewMatrices.at(0)) * pPose->eyeViewMatrices.at(1);
   memcpy(out->view_r_rel, glm::value_ptr(view_r_rel), sizeof(out->view_r_rel));
 
   memcpy(out->l_controller, glm::value_ptr(ctrl_l), sizeof(out->l_controller));
@@ -481,40 +485,40 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
     memcpy(dat->l_view, out->view_l, sizeof(dat->l_view));
     memcpy(dat->r_view, out->view_r, sizeof(dat->r_view));
 
-    //dat->grab_val[0] = headset->pinch_l ? 0.9 : 0.0;//headset->grab_value[0].currentState;
-    //dat->grab_val[1] = headset->pinch_r ? 0.9 : 0.0;//headset->grab_value[1].currentState;
-    dat->grab_val[0] = headset->grab_value[0].currentState;
-    dat->grab_val[1] = headset->grab_value[1].currentState;
-    dat->grip_val[0] = headset->grip_value[0].currentState;
-    dat->grip_val[1] = headset->grip_value[1].currentState;
+    //dat->grab_val[0] = pPose->pinch_l ? 0.9 : 0.0;//pPose->grab_value[0].currentState;
+    //dat->grab_val[1] = pPose->pinch_r ? 0.9 : 0.0;//pPose->grab_value[1].currentState;
+    dat->grab_val[0] = pPose->grab_value[0].currentState;
+    dat->grab_val[1] = pPose->grab_value[1].currentState;
+    dat->grip_val[0] = pPose->grip_value[0].currentState;
+    dat->grip_val[1] = pPose->grip_value[1].currentState;
 
     memcpy(dat->l_controller, out->l_controller, sizeof(dat->l_controller));
     memcpy(dat->r_controller, out->r_controller, sizeof(dat->r_controller));
     //printf("grabs %f %f\n", dat->grab_val[0], dat->grab_val[1]);
 
-    memcpy(dat->gaze_mat, glm::value_ptr(headset->l_eye_mat), sizeof(dat->gaze_mat));
+    memcpy(dat->gaze_mat, glm::value_ptr(pPose->l_eye_mat), sizeof(dat->gaze_mat));
 
-    glm::quat gaze_quat = headset->l_eye_quat;
+    glm::quat gaze_quat = pPose->l_eye_quat;
     gaze_quat = l_q * gaze_quat;
     dat->gaze_quat[0] = gaze_quat.x;
     dat->gaze_quat[1] = gaze_quat.y;
     dat->gaze_quat[2] = gaze_quat.z;
     dat->gaze_quat[3] = gaze_quat.w;
-    dat->l_controller_quat[0] = headset->tracked_locations[0].pose.orientation.x;
-    dat->l_controller_quat[1] = headset->tracked_locations[0].pose.orientation.y;
-    dat->l_controller_quat[2] = headset->tracked_locations[0].pose.orientation.z;
-    dat->l_controller_quat[3] = headset->tracked_locations[0].pose.orientation.w;
-    dat->r_controller_quat[0] = headset->tracked_locations[1].pose.orientation.x;
-    dat->r_controller_quat[1] = headset->tracked_locations[1].pose.orientation.y;
-    dat->r_controller_quat[2] = headset->tracked_locations[1].pose.orientation.z;
-    dat->r_controller_quat[3] = headset->tracked_locations[1].pose.orientation.w;
+    dat->l_controller_quat[0] = pPose->tracked_locations[0].pose.orientation.x;
+    dat->l_controller_quat[1] = pPose->tracked_locations[0].pose.orientation.y;
+    dat->l_controller_quat[2] = pPose->tracked_locations[0].pose.orientation.z;
+    dat->l_controller_quat[3] = pPose->tracked_locations[0].pose.orientation.w;
+    dat->r_controller_quat[0] = pPose->tracked_locations[1].pose.orientation.x;
+    dat->r_controller_quat[1] = pPose->tracked_locations[1].pose.orientation.y;
+    dat->r_controller_quat[2] = pPose->tracked_locations[1].pose.orientation.z;
+    dat->r_controller_quat[3] = pPose->tracked_locations[1].pose.orientation.w;
 
     glm::vec3 z_vec = glm::vec3(-dat->gaze_mat[8], -dat->gaze_mat[9], -dat->gaze_mat[10]);
 
-    dat->system_button = headset->system_button ? 1 : 0;
-    dat->menu_button = headset->menu_button ? 1 : 0;
-    dat->left_touch_button = headset->left_touch_button ? 1 : 0;
-    dat->right_touch_button = headset->right_touch_button ? 1 : 0;
+    dat->system_button = pPose->system_button ? 1 : 0;
+    dat->menu_button = pPose->menu_button ? 1 : 0;
+    dat->left_touch_button = pPose->left_touch_button ? 1 : 0;
+    dat->right_touch_button = pPose->right_touch_button ? 1 : 0;
 
     memcpy(dat->gaze_vec, glm::value_ptr(z_vec), sizeof(dat->gaze_vec));
 

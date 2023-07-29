@@ -31,6 +31,8 @@ Headset::Headset(const Context* context) : context(context)
 {
   const VkDevice device = context->getVkDevice();
 
+  lastPoseIdx = 0;
+
   // Create a render pass
   {
     constexpr uint32_t viewMask = 0b00000011;
@@ -158,14 +160,6 @@ Headset::Headset(const Context* context) : context(context)
     util::error(Error::GenericOpenXR);
     valid = false;
     return;
-  }
-
-  // Allocate the eye poses
-  eyePoses.resize(eyeCount);
-  for (XrView& eyePose : eyePoses)
-  {
-    eyePose.type = XR_TYPE_VIEW;
-    eyePose.next = nullptr;
   }
 
   // Verify that the desired color format is supported
@@ -381,11 +375,6 @@ Headset::Headset(const Context* context) : context(context)
                                                 static_cast<int32_t>(eyeImageInfo.recommendedImageRectHeight) };
   }
 
-  // Allocate view and projection matrices
-  eyeViewMatrices.resize(eyeCount);
-  eyeProjectionMatrices.resize(eyeCount);
-
-
   // Actions
   // --- Set up input (actions)
 
@@ -436,10 +425,6 @@ Headset::Headset(const Context* context) : context(context)
   
   xrStringToPath(xrInstance, "/user/hand/left/input/grip/pose", &grip_pose_path[HAND_LEFT_INDEX]);
   xrStringToPath(xrInstance, "/user/hand/right/input/grip/pose", &grip_pose_path[HAND_RIGHT_INDEX]);
-
-  xrStringToPath(xrInstance, "/user/hand/left/output/haptic", &haptic_path[HAND_LEFT_INDEX]);
-  xrStringToPath(xrInstance, "/user/hand/right/output/haptic", &haptic_path[HAND_RIGHT_INDEX]);
-
 
   XrActionSetCreateInfo gameplay_actionset_info = {
       .type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
@@ -534,20 +519,6 @@ Headset::Headset(const Context* context) : context(context)
     //  return 1;
   }
 
-  
-  {
-    XrActionCreateInfo action_info = {.type = XR_TYPE_ACTION_CREATE_INFO,
-                                      .next = NULL,
-                                      .actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT,
-                                      .countSubactionPaths = HAND_COUNT,
-                                      .subactionPaths = hand_paths};
-    strcpy(action_info.actionName, "haptic");
-    strcpy(action_info.localizedActionName, "Haptic Vibration");
-    result = xrCreateAction(gameplay_actionset, &action_info, &haptic_action);
-    //if (!XR_SUCCEEDED(result))
-    //  return 1;
-  }
-
   // suggest actions for valve index controller
   {
     XrPath interaction_profile_path;
@@ -563,8 +534,6 @@ Headset::Headset(const Context* context) : context(context)
         {.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT_INDEX]},
         {.action = grip_action_float, .binding = grip_value_path[HAND_LEFT_INDEX]},
         {.action = grip_action_float, .binding = grip_value_path[HAND_RIGHT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_LEFT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
         {.action = b_y_action_bool, .binding = b_click_path[HAND_LEFT_INDEX]},
@@ -598,8 +567,6 @@ Headset::Headset(const Context* context) : context(context)
         {.action = grab_action_float, .binding = trigger_value_path[HAND_RIGHT_INDEX]},
         {.action = grip_action_float, .binding = grip_value_path[HAND_LEFT_INDEX]},
         {.action = grip_action_float, .binding = grip_value_path[HAND_RIGHT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
         {.action = system_action_bool, .binding = menu_click_path[HAND_LEFT_INDEX]},
         {.action = system_action_bool, .binding = system_click_path[HAND_RIGHT_INDEX]},
         {.action = b_y_action_bool, .binding = y_click_path[HAND_LEFT_INDEX]},
@@ -634,8 +601,6 @@ Headset::Headset(const Context* context) : context(context)
         // boolean input select/click will be converted to float that is either 0 or 1
         {.action = grab_action_float, .binding = select_click_path[HAND_LEFT_INDEX]},
         {.action = grab_action_float, .binding = select_click_path[HAND_RIGHT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_LEFT_INDEX]},
-        {.action = haptic_action, .binding = haptic_path[HAND_RIGHT_INDEX]},
         {.action = system_action_bool, .binding = select_click_path[HAND_LEFT_INDEX]},
         {.action = system_action_bool, .binding = select_click_path[HAND_RIGHT_INDEX]},
     };
@@ -681,23 +646,40 @@ Headset::Headset(const Context* context) : context(context)
   // Allocate buffers to receive joint location and velocity data before frame
   // loop starts
 
-  leftVelocities = {XR_TYPE_HAND_JOINT_VELOCITIES_EXT};
-  leftVelocities.jointCount = XR_HAND_JOINT_COUNT_EXT;
-  leftVelocities.jointVelocities = leftJointVelocities;
+  for (int i = 0; i < STORED_POSE_COUNT; i++)
+  {
+    PoseData* p = &storedPoses[i];
 
-  leftLocations = {XR_TYPE_HAND_JOINT_LOCATIONS_EXT};
-  leftLocations.next = &leftVelocities;
-  leftLocations.jointCount = XR_HAND_JOINT_COUNT_EXT;
-  leftLocations.jointLocations = leftJointLocations;
+    // Allocate the eye poses
+    p->eyePoses.resize(eyeCount);
+    for (XrView& eyePose : p->eyePoses)
+    {
+      eyePose.type = XR_TYPE_VIEW;
+      eyePose.next = nullptr;
+    }
 
-  rightVelocities = {XR_TYPE_HAND_JOINT_VELOCITIES_EXT};
-  rightVelocities.jointCount = XR_HAND_JOINT_COUNT_EXT;
-  rightVelocities.jointVelocities = rightJointVelocities;
+    // Allocate view and projection matrices
+    p->eyeViewMatrices.resize(eyeCount);
+    p->eyeProjectionMatrices.resize(eyeCount);
 
-  rightLocations = {XR_TYPE_HAND_JOINT_LOCATIONS_EXT};
-  rightLocations.next = &rightVelocities;
-  rightLocations.jointCount = XR_HAND_JOINT_COUNT_EXT;
-  rightLocations.jointLocations = rightJointLocations;
+    p->leftVelocities = {XR_TYPE_HAND_JOINT_VELOCITIES_EXT};
+    p->leftVelocities.jointCount = XR_HAND_JOINT_COUNT_EXT;
+    p->leftVelocities.jointVelocities = p->leftJointVelocities;
+
+    p->leftLocations = {XR_TYPE_HAND_JOINT_LOCATIONS_EXT};
+    p->leftLocations.next = &p->leftVelocities;
+    p->leftLocations.jointCount = XR_HAND_JOINT_COUNT_EXT;
+    p->leftLocations.jointLocations = p->leftJointLocations;
+
+    p->rightVelocities = {XR_TYPE_HAND_JOINT_VELOCITIES_EXT};
+    p->rightVelocities.jointCount = XR_HAND_JOINT_COUNT_EXT;
+    p->rightVelocities.jointVelocities = p->rightJointVelocities;
+
+    p->rightLocations = {XR_TYPE_HAND_JOINT_LOCATIONS_EXT};
+    p->rightLocations.next = &p->rightVelocities;
+    p->rightLocations.jointCount = XR_HAND_JOINT_COUNT_EXT;
+    p->rightLocations.jointLocations = p->rightJointLocations;
+  }
 }
 
 Headset::~Headset()
@@ -722,9 +704,15 @@ Headset::~Headset()
   vkDestroyRenderPass(vkDevice, renderPass, nullptr);
 }
 
-Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
+Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 {
   const XrInstance instance = context->getXrInstance();
+  int curPoseIdx = (lastPoseIdx + 1) % STORED_POSE_COUNT;
+  PoseData* pOut = &storedPoses[curPoseIdx];
+
+  if (pPoseIdx) {
+    *pPoseIdx = curPoseIdx;
+  }
 
   // Poll OpenXR events
   XrEventDataBuffer buffer;
@@ -809,8 +797,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   viewLocateInfo.viewConfigurationType = context->getXrViewType();
   viewLocateInfo.displayTime = frameState.predictedDisplayTime;
   viewLocateInfo.space = space;
-  result = xrLocateViews(session, &viewLocateInfo, &viewState, static_cast<uint32_t>(eyePoses.size()), &viewCount,
-                         eyePoses.data());
+  result = xrLocateViews(session, &viewLocateInfo, &viewState, static_cast<uint32_t>(pOut->eyePoses.size()), &viewCount,
+                         pOut->eyePoses.data());
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
@@ -828,41 +816,32 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   {
     // Copy the eye poses into the eye render infos
     XrCompositionLayerProjectionView& eyeRenderInfo = eyeRenderInfos.at(eyeIndex);
-    const XrView& eyePose = eyePoses.at(eyeIndex);
+    const XrView& eyePose = pOut->eyePoses.at(eyeIndex);
     eyeRenderInfo.pose = eyePose.pose;
     eyeRenderInfo.fov = eyePose.fov;
 
     // Update the view and projection matrices
     const XrPosef& pose = eyeRenderInfo.pose;
-    eyeViewMatrices.at(eyeIndex) = util::poseToMatrix(pose);
-    eyeProjectionMatrices.at(eyeIndex) = util::createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
+    pOut->eyeViewMatrices.at(eyeIndex) = util::poseToMatrix(pose);
+    pOut->eyeProjectionMatrices.at(eyeIndex) = util::createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
     if (eyeIndex == 0)
     {
-      eyeTangents_l[0] = eyeRenderInfo.fov.angleLeft;
-      eyeTangents_l[1] = eyeRenderInfo.fov.angleRight;
-      eyeTangents_l[2] = eyeRenderInfo.fov.angleUp;
-      eyeTangents_l[3] = eyeRenderInfo.fov.angleDown;
+      pOut->eyeTangents_l[0] = eyeRenderInfo.fov.angleLeft;
+      pOut->eyeTangents_l[1] = eyeRenderInfo.fov.angleRight;
+      pOut->eyeTangents_l[2] = eyeRenderInfo.fov.angleUp;
+      pOut->eyeTangents_l[3] = eyeRenderInfo.fov.angleDown;
     }
     else {
-      eyeTangents_r[0] = eyeRenderInfo.fov.angleLeft;
-      eyeTangents_r[1] = eyeRenderInfo.fov.angleRight;
-      eyeTangents_r[2] = eyeRenderInfo.fov.angleUp;
-      eyeTangents_r[3] = eyeRenderInfo.fov.angleDown;
+      pOut->eyeTangents_r[0] = eyeRenderInfo.fov.angleLeft;
+      pOut->eyeTangents_r[1] = eyeRenderInfo.fov.angleRight;
+      pOut->eyeTangents_r[2] = eyeRenderInfo.fov.angleUp;
+      pOut->eyeTangents_r[3] = eyeRenderInfo.fov.angleDown;
     }
-  }
-
-  // Acquire the swapchain image
-  XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-  result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
-  if (XR_FAILED(result))
-  {
-    util::error(Error::GenericOpenXR);
-    return BeginFrameResult::Error;
   }
 
   for (int i = 0; i < 64; i++) {
-    tracked_locations[i].pose.position = {0.0, 0.0, 0.0};
-    tracked_locations[i].pose.orientation = {0.0, 0.0, 0.0, 1.0};
+    pOut->tracked_locations[i].pose.position = {0.0, 0.0, 0.0};
+    pOut->tracked_locations[i].pose.orientation = {0.0, 0.0, 0.0, 1.0};
   }
 
   // query each value / location with a subaction path != XR_NULL_PATH
@@ -879,10 +858,10 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   result = xrSyncActions(session, &actions_sync_info);
   //xr_result(self->instance, result, "failed to sync actions!");
 
-  system_button = false;
-  menu_button = false;
-  left_touch_button = false;
-  right_touch_button = false;
+  pOut->system_button = false;
+  pOut->menu_button = false;
+  pOut->left_touch_button = false;
+  pOut->right_touch_button = false;
 
   for (int i = 0; i < HAND_COUNT; i++) {
     XrActionStatePose hand_pose_state = {.type = XR_TYPE_ACTION_STATE_POSE, .next = NULL};
@@ -896,11 +875,11 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     }
     //printf("Hand pose %d active: %d\n", i, hand_pose_state.isActive);
 
-    tracked_locations[i].type = XR_TYPE_SPACE_LOCATION;
-    tracked_locations[i].next = NULL;
+    pOut->tracked_locations[i].type = XR_TYPE_SPACE_LOCATION;
+    pOut->tracked_locations[i].next = NULL;
 
     result = xrLocateSpace(hand_pose_spaces[i], space, frameState.predictedDisplayTime,
-                           &tracked_locations[i]);
+                           &pOut->tracked_locations[i]);
     //xr_check(instance, result, "failed to locate space %d!", i);
 
 
@@ -912,28 +891,29 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     );*/
 
 
-    grab_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
-    grab_value[i].next = NULL;
-    grab_value[i].currentState = 0.0;
+    pOut->grab_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
+    pOut->grab_value[i].next = NULL;
+    pOut->grab_value[i].currentState = 0.0;
     {
       XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
                                        .next = NULL,
                                        .action = grab_action_float,
                                        .subactionPath = hand_paths[i]};
 
-      result = xrGetActionStateFloat(session, &get_info, &grab_value[i]);
+      result = xrGetActionStateFloat(session, &get_info, &pOut->grab_value[i]);
       //xr_check(instance, result, "failed to get grab value!");
     }
 
-    grip_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
-    grip_value[i].next = NULL;
+    pOut->grip_value[i].type = XR_TYPE_ACTION_STATE_FLOAT;
+    pOut->grip_value[i].next = NULL;
+    pOut->grip_value[i].currentState = 0.0;
     {
       XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
                                        .next = NULL,
                                        .action = grip_action_float,
                                        .subactionPath = hand_paths[i]};
 
-      result = xrGetActionStateFloat(session, &get_info, &grip_value[i]);
+      result = xrGetActionStateFloat(session, &get_info, &pOut->grip_value[i]);
       //xr_check(instance, result, "failed to get grab value!");
     }
 
@@ -941,25 +921,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     // grabValue[i].isActive, grabValue[i].currentState,
     // grabValue[i].changedSinceLastSync);
 
-    if (grab_value[i].isActive && grab_value[i].currentState > 0.75) {
-      XrHapticVibration vibration = {.type = XR_TYPE_HAPTIC_VIBRATION,
-                                     .next = NULL,
-                                     .amplitude = 0.5,
-                                     .duration = XR_MIN_HAPTIC_DURATION,
-                                     .frequency = XR_FREQUENCY_UNSPECIFIED};
-
-      XrHapticActionInfo haptic_action_info = {.type = XR_TYPE_HAPTIC_ACTION_INFO,
-                                               .next = NULL,
-                                               .action = haptic_action,
-                                               .subactionPath = hand_paths[i]};
-      result = xrApplyHapticFeedback(session, &haptic_action_info,
-                                     (const XrHapticBaseHeader*)&vibration);
-      //xr_check(instance, result, "failed to apply haptic feedback!");
-      // printf("Sent haptic output to hand %d\n", i);
-    }
-
-    system_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
-    system_value[i].next = NULL;
+    pOut->system_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
+    pOut->system_value[i].next = NULL;
     {
       XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
                                        .next = NULL,
@@ -967,20 +930,20 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
                                        .subactionPath = hand_paths[i]};
 
       
-      result = xrGetActionStateBoolean(session, &get_info, &system_value[i]);
+      result = xrGetActionStateBoolean(session, &get_info, &pOut->system_value[i]);
       //xr_check(instance, result, "failed to get grab value!");
 
       //printf("system %u, %x\n", i, system_value[i].currentState);
-      if (system_value[i].currentState && i == HAND_LEFT_INDEX) {
-        menu_button = true;
+      if (pOut->system_value[i].currentState && i == HAND_LEFT_INDEX) {
+        pOut->menu_button = true;
       }
-      else if (system_value[i].currentState && i == HAND_RIGHT_INDEX) {
-        system_button = true;
+      else if (pOut->system_value[i].currentState && i == HAND_RIGHT_INDEX) {
+        pOut->system_button = true;
       }
     }
 
-    b_y_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
-    b_y_value[i].next = NULL;
+    pOut->b_y_value[i].type = XR_TYPE_ACTION_STATE_BOOLEAN;
+    pOut->b_y_value[i].next = NULL;
     {
       XrActionStateGetInfo get_info = {.type = XR_TYPE_ACTION_STATE_GET_INFO,
                                        .next = NULL,
@@ -988,15 +951,15 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
                                        .subactionPath = hand_paths[i]};
 
       
-      result = xrGetActionStateBoolean(session, &get_info, &b_y_value[i]);
+      result = xrGetActionStateBoolean(session, &get_info, &pOut->b_y_value[i]);
       //xr_check(instance, result, "failed to get grab value!");
 
       //printf("system %u, %x\n", i, system_value[i].currentState);
-      if (b_y_value[i].currentState && i == HAND_LEFT_INDEX) {
-        left_touch_button = true;
+      if (pOut->b_y_value[i].currentState && i == HAND_LEFT_INDEX) {
+        pOut->left_touch_button = true;
       }
-      else if (b_y_value[i].currentState && i == HAND_RIGHT_INDEX) {
-        right_touch_button = true;
+      else if (pOut->b_y_value[i].currentState && i == HAND_RIGHT_INDEX) {
+        pOut->right_touch_button = true;
       }
     }
   };
@@ -1006,28 +969,28 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   locateInfo.time = frameState.predictedDisplayTime;
 
   if (left_hand_valid)
-    context->xrLocateHandJointsEXT(leftHandTracker, &locateInfo, &leftLocations);
+    context->xrLocateHandJointsEXT(leftHandTracker, &locateInfo, &pOut->leftLocations);
   if (right_hand_valid)
-    context->xrLocateHandJointsEXT(rightHandTracker, &locateInfo, &rightLocations);
+    context->xrLocateHandJointsEXT(rightHandTracker, &locateInfo, &pOut->rightLocations);
 
-  if (leftLocations.isActive) {
+  if (pOut->leftLocations.isActive) {
       // The returned joint location array can be directly indexed with
       // XrHandJointEXT enum.
       const XrPosef &indexTipInWorld =
-          leftJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].pose;
+          pOut->leftJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].pose;
       const XrPosef &thumbTipInWorld =
-          leftJointLocations[XR_HAND_JOINT_THUMB_TIP_EXT].pose;
+          pOut->leftJointLocations[XR_HAND_JOINT_THUMB_TIP_EXT].pose;
         const XrPosef &palmInWorld =
-          leftJointLocations[XR_HAND_JOINT_WRIST_EXT].pose;
+          pOut->leftJointLocations[XR_HAND_JOINT_WRIST_EXT].pose;
 
       // using the returned radius and velocity of index finger tip.
       const float indexTipRadius =
-          leftJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].radius;
+          pOut->leftJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].radius;
       const XrHandJointVelocityEXT &indexTipVelocity =
-          leftJointVelocities[XR_HAND_JOINT_INDEX_TIP_EXT];
+          pOut->leftJointVelocities[XR_HAND_JOINT_INDEX_TIP_EXT];
 
       for (int i = 0; i <= XR_HAND_JOINT_LITTLE_TIP_EXT; i++) {
-        tracked_locations[2+i].pose = leftJointLocations[i].pose;
+        pOut->tracked_locations[2+i].pose = pOut->leftJointLocations[i].pose;
       }
       
       glm::vec3 v1 = {indexTipInWorld.position.x, indexTipInWorld.position.y, indexTipInWorld.position.z};
@@ -1035,23 +998,23 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
       float distance = glm::length(v2 - v1);
 
-      pinch_l = distance < 0.01;
+      pOut->pinch_l = distance < 0.01;
 
       //printf("l: %f\n", distance);
 
       //printf("l: %f %f %f\n", palmInWorld.position.x, palmInWorld.position.y, palmInWorld.position.z);
   }
 
-  if (rightLocations.isActive) {
+  if (pOut->rightLocations.isActive) {
       const XrPosef &indexTipInWorld =
-          rightJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].pose;
+          pOut->rightJointLocations[XR_HAND_JOINT_INDEX_TIP_EXT].pose;
       const XrPosef &thumbTipInWorld =
-          rightJointLocations[XR_HAND_JOINT_THUMB_TIP_EXT].pose;
+          pOut->rightJointLocations[XR_HAND_JOINT_THUMB_TIP_EXT].pose;
         const XrPosef &palmInWorld =
-          rightJointLocations[XR_HAND_JOINT_WRIST_EXT].pose;
+          pOut->rightJointLocations[XR_HAND_JOINT_WRIST_EXT].pose;
 
       for (int i = 0; i <= XR_HAND_JOINT_LITTLE_TIP_EXT; i++) {
-        tracked_locations[2+XR_HAND_JOINT_LITTLE_TIP_EXT+1+i].pose = rightJointLocations[i].pose;
+        pOut->tracked_locations[2+XR_HAND_JOINT_LITTLE_TIP_EXT+1+i].pose = pOut->rightJointLocations[i].pose;
       }
 
       glm::vec3 v1 = {indexTipInWorld.position.x, indexTipInWorld.position.y, indexTipInWorld.position.z};
@@ -1059,7 +1022,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
       float distance = glm::length(v2 - v1);
 
-      pinch_r = distance < 0.01;
+      pOut->pinch_r = distance < 0.01;
 
       //printf("r: %f\n", distance);
 
@@ -1068,27 +1031,36 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
   //printf("Left 1? %f %f %f %f\n", ql_xrsp_sidechannel_eye_l_orient[0], ql_xrsp_sidechannel_eye_l_orient[1], ql_xrsp_sidechannel_eye_l_orient[2], ql_xrsp_sidechannel_eye_l_orient[3]);
   glm::quat l_q(ql_xrsp_sidechannel_eye_l_orient[3], ql_xrsp_sidechannel_eye_l_orient[0], ql_xrsp_sidechannel_eye_l_orient[1], ql_xrsp_sidechannel_eye_l_orient[2]);
-  l_eye_mat = glm::toMat4(l_q);
-  glm::mat4 l_view_no_rot = eyeViewMatrices.at(0);
+  pOut->l_eye_mat = glm::toMat4(l_q);
+  glm::mat4 l_view_no_rot = pOut->eyeViewMatrices.at(0);
   l_view_no_rot[3] = glm::vec4(0, 0, 0, 1);
-  l_eye_mat = l_view_no_rot * l_eye_mat;
-  l_eye_quat = l_q;
+  pOut->l_eye_mat = l_view_no_rot * pOut->l_eye_mat;
+  pOut->l_eye_quat = l_q;
 
   glm::quat r_q(ql_xrsp_sidechannel_eye_r_orient[3], ql_xrsp_sidechannel_eye_r_orient[0], ql_xrsp_sidechannel_eye_r_orient[1], ql_xrsp_sidechannel_eye_r_orient[2]);
-  r_eye_mat = glm::toMat4(r_q);
-  glm::mat4 r_view_no_rot = eyeViewMatrices.at(1);
+  pOut->r_eye_mat = glm::toMat4(r_q);
+  glm::mat4 r_view_no_rot = pOut->eyeViewMatrices.at(1);
   r_view_no_rot[3] = glm::vec4(0, 0, 0, 1);
-  r_eye_mat = r_view_no_rot * r_eye_mat;
+  pOut->r_eye_mat = r_view_no_rot * pOut->r_eye_mat;
 
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
 }
 
-void Headset::beginFrameRender()
+void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
 {
+  // Acquire the swapchain image
+  XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+  XrResult result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
+  if (XR_FAILED(result))
+  {
+    util::error(Error::GenericOpenXR);
+    return;// BeginFrameResult::Error;
+  }
+
   // Wait for the swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
   swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
-  XrResult result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
+  result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
@@ -1143,11 +1115,6 @@ bool Headset::isExitRequested() const
   return exitRequested;
 }
 
-VkRenderPass Headset::getRenderPass() const
-{
-  return renderPass;
-}
-
 size_t Headset::getEyeCount() const
 {
   return eyeCount;
@@ -1157,16 +1124,6 @@ VkExtent2D Headset::getEyeResolution(size_t eyeIndex) const
 {
   const XrViewConfigurationView& eyeInfo = eyeImageInfos.at(eyeIndex);
   return { eyeInfo.recommendedImageRectWidth, eyeInfo.recommendedImageRectHeight };
-}
-
-glm::mat4 Headset::getEyeViewMatrix(size_t eyeIndex) const
-{
-  return eyeViewMatrices.at(eyeIndex);
-}
-
-glm::mat4 Headset::getEyeProjectionMatrix(size_t eyeIndex) const
-{
-  return eyeProjectionMatrices.at(eyeIndex);
 }
 
 RenderTarget* Headset::getRenderTarget(size_t swapchainImageIndex) const

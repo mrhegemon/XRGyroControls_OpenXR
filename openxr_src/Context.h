@@ -26,7 +26,6 @@ public:
   uint32_t getVkDrawQueueFamilyIndex() const;
   VkDevice getVkDevice() const;
   VkQueue getVkDrawQueue() const;
-  VkQueue getVkPresentQueue() const;
 
   PFN_xrCreateHandTrackerEXT xrCreateHandTrackerEXT = nullptr;
   PFN_xrDestroyHandTrackerEXT xrDestroyHandTrackerEXT = nullptr;
@@ -49,7 +48,7 @@ private:
   VkPhysicalDevice physicalDevice = nullptr;
   uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
   VkDevice device = nullptr;
-  VkQueue drawQueue = nullptr, presentQueue = nullptr;
+  VkQueue drawQueue = nullptr;
 
 #ifdef DEBUG
   PFN_xrCreateDebugUtilsMessengerEXT xrCreateDebugUtilsMessengerEXT = nullptr;

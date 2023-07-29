@@ -34,6 +34,8 @@ add_library(OpenXRCpp STATIC
   openxr_src/Main.h
   openxr_src/Pipeline.cpp
   openxr_src/Pipeline.h
+  openxr_src/PoseData.cpp
+  openxr_src/PoseData.h
   openxr_src/Renderer.cpp
   openxr_src/Renderer.h
   openxr_src/RenderProcess.cpp

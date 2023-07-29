@@ -764,13 +764,6 @@ bool Context::createDevice()
     return false;
   }
 
-  vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
-  if (!presentQueue)
-  {
-    util::error(Error::GenericVulkan);
-    return false;
-  }
-
   return true;
 }
 
@@ -822,9 +815,4 @@ VkDevice Context::getVkDevice() const
 VkQueue Context::getVkDrawQueue() const
 {
   return drawQueue;
-}
-
-VkQueue Context::getVkPresentQueue() const
-{
-  return presentQueue;
 }

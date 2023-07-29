@@ -12,12 +12,15 @@
 #include <vector>
 #include <mutex>
 
+#include "PoseData.h"
+
 class Context;
 class RenderTarget;
 
 #define HAND_LEFT_INDEX (0)
 #define HAND_RIGHT_INDEX (1)
 #define HAND_COUNT (2)
+#define STORED_POSE_COUNT (6)
 
 class Headset final
 {
@@ -33,8 +36,8 @@ public:
     SkipRender,  // Skip rendering the frame but end it
     SkipFully    // Skip processing this frame entirely without ending it
   };
-  BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
-  void beginFrameRender();
+  BeginFrameResult beginFrame(int* pPoseIdx);
+  void beginFrameRender(uint32_t& swapchainImageIndex);
   void endFrame() const;
 
   bool isValid() const;
@@ -46,27 +49,9 @@ public:
   glm::mat4 getEyeProjectionMatrix(size_t eyeIndex) const;
   RenderTarget* getRenderTarget(size_t swapchainImageIndex) const;
 
-  XrActionStateFloat grab_value[HAND_COUNT];
-  XrActionStateFloat grip_value[HAND_COUNT];
-  XrActionStateBoolean system_value[HAND_COUNT];
-  XrActionStateBoolean b_y_value[HAND_COUNT];
-  XrSpaceLocation tracked_locations[64];
   XrActionSet gameplay_actionset;
 
-  bool pinch_l;
-  bool pinch_r;
-  bool system_button;
-  bool menu_button;
-  bool left_touch_button = false;
-  bool right_touch_button = false;
-
-  glm::quat l_eye_quat;
-  glm::quat r_eye_quat;
-  glm::mat4 l_eye_mat;
-  glm::mat4 r_eye_mat;
-
   XrPath grip_pose_path[HAND_COUNT];
-  XrPath haptic_path[HAND_COUNT];
   XrPath thumbstick_y_path[HAND_COUNT];
   XrPath trigger_value_path[HAND_COUNT];
   XrPath grip_value_path[HAND_COUNT];
@@ -79,25 +64,10 @@ public:
   XrHandTrackerEXT leftHandTracker;
   XrHandTrackerEXT rightHandTracker;
 
-  XrHandJointLocationEXT leftJointLocations[XR_HAND_JOINT_COUNT_EXT];
-  XrHandJointVelocityEXT leftJointVelocities[XR_HAND_JOINT_COUNT_EXT];
-
-  XrHandJointLocationEXT rightJointLocations[XR_HAND_JOINT_COUNT_EXT];
-  XrHandJointVelocityEXT rightJointVelocities[XR_HAND_JOINT_COUNT_EXT];
-
-  XrHandJointVelocitiesEXT leftVelocities;
-  XrHandJointLocationsEXT leftLocations;
-
-  XrHandJointVelocitiesEXT rightVelocities;
-  XrHandJointLocationsEXT rightLocations;
-
-  std::vector<XrView> eyePoses;
-  std::vector<glm::mat4> eyeViewMatrices;
-  std::vector<glm::mat4> eyeProjectionMatrices;
-  float eyeTangents_l[4];
-  float eyeTangents_r[4];
-
   std::mutex eyePoseMutex;
+
+  PoseData storedPoses[STORED_POSE_COUNT];
+  int lastPoseIdx;
 
 private:
   bool valid = true;
@@ -134,7 +104,6 @@ private:
   XrAction grip_action_float;
   XrAction system_action_bool;
   XrAction b_y_action_bool;
-  XrAction haptic_action;
   XrPath hand_paths[HAND_COUNT];
 
   bool beginSession() const;
