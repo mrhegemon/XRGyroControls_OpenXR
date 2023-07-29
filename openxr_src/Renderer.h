@@ -25,15 +25,9 @@ public:
   VkCommandBuffer getCurrentCommandBuffer() const;
   VkSemaphore getCurrentDrawableSemaphore() const;
   VkSemaphore getCurrentPresentableSemaphore() const;
-  void createTextureImage_L(const Context* context, int which);
   void createTextureImageHax_L(const Context* context, int which);
-  void createTextureImageView_L(const Context* context, int which);
-  void createTextureSampler_L(const Context* context, int which);
 
-  void createTextureImage_R(const Context* context, int which);
   void createTextureImageHax_R(const Context* context, int which);
-  void createTextureImageView_R(const Context* context, int which);
-  void createTextureSampler_R(const Context* context, int which);
 
   VkCommandBuffer beginSingleTimeCommands(const Context* context);
   void endSingleTimeCommands(const Context* context, VkCommandBuffer commandBuffer);
@@ -52,21 +46,10 @@ private:
   const Headset* headset = nullptr;
 
   VkCommandPool commandPool = nullptr;
-  VkDescriptorPool descriptorPool = nullptr;
-  VkDescriptorSetLayout descriptorSetLayout = nullptr;
   std::vector<RenderProcess*> renderProcesses;
-  VkPipelineLayout pipelineLayout = nullptr;
-  Pipeline* rectPipeline = nullptr;
-  Buffer *vertexBuffer = nullptr, *indexBuffer = nullptr;
   size_t currentRenderProcessIndex = 0u;
 
   VkImage textureImage_L[3];
-  VkDeviceMemory textureImageMemory_L[3];
-  VkImageView textureImageView_L[3];
-  VkSampler textureSampler_L[3];
 
   VkImage textureImage_R[3];
-  VkDeviceMemory textureImageMemory_R[3];
-  VkImageView textureImageView_R[3];
-  VkSampler textureSampler_R[3];
 };

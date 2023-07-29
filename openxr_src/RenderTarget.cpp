@@ -50,6 +50,9 @@ RenderTarget::RenderTarget(VkDevice device,
     valid = false;
     return;
   }
+
+  this->w = size.width;
+  this->h = size.height;
 }
 
 RenderTarget::~RenderTarget()

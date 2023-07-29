@@ -284,6 +284,7 @@ extern "C" int openxr_full_loop(int which)
   }
   else if (frameResult == Headset::BeginFrameResult::RenderFully)
   {
+    renderer->render(local_swapchainImageIndex, which);
     //printf("wait for frame...\n");
     for (int i = 0; i < 32; i++)
     {
@@ -304,7 +305,7 @@ extern "C" int openxr_full_loop(int which)
   }
   //printf("XRHax: OpenXR loop done\n");
 
-  //context->sync(); // Sync before destroying so that resources are free
+  context->sync(); // Sync before destroying so that resources are free
   renderMutex[0].unlock();
   //printf("releasing lock\n");
 
@@ -313,6 +314,8 @@ extern "C" int openxr_full_loop(int which)
 
 extern "C" void openxr_spawn_renderframe(int which)
 {
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
   for (int i = 0; i < 40; i++)
   {
     if (renderMutex[0].try_lock()) {
@@ -383,6 +386,15 @@ extern "C" void openxr_headset_get_data(openxr_headset_data* out, int which)
     offset_y = 1.22;
     offset_z = eyePose0.pose.position.z - 0.5;
     offsets_set = true;
+  }
+
+  if (headset->grab_value[0].currentState > 0.5) {
+      offset_y = 2.22;
+      printf("Down!\n");
+  }
+  else {
+    printf("Not down!\n");
+    offset_y = 1.22;
   }
 
   out->l_x  = eyePose0.pose.position.x - offset_x;

@@ -14,6 +14,10 @@ if [[ -z "${XCODE_BETA_PATH}" ]]; then
     export XCODE_BETA_PATH="/Applications/Xcode-beta.app"
 fi
 
+pushd $MONADO_BUILD_DIR
+make
+popd
+
 if ! [[ -d "libusb" ]]; then
     mkdir -p libusb
     pushd libusb

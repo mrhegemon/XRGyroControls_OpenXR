@@ -142,7 +142,7 @@ static id<MTLTexture> MakeOurTextureBasedOnTheirTexture(id<MTLDevice> device,
                                                          width:originalTexture.width
                                                         height:originalTexture.height
                                                      mipmapped:false];
-  descriptor.storageMode = originalTexture.storageMode;
+  descriptor.storageMode = MTLStorageModeMemoryless;//originalTexture.storageMode;
   return [device newTextureWithDescriptor:descriptor];
 }
 
@@ -275,6 +275,8 @@ void pull_openxr_data()
 {
   int which_guess = (last_which + 1) % 3;
 
+  printf("pull_openxr_data %u (%u)\n", which_guess, pulled_which == which_guess);
+
   if (pulled_which == which_guess) {
     return;
   }
@@ -292,7 +294,6 @@ void pull_openxr_data()
 
     pulled_which = which_guess;
   }
-
 
   // Apple
   // X is -left/+right
@@ -354,6 +355,7 @@ void pull_openxr_data()
   left_eye_zbasis[2] = view_mat_l.columns[2][2];
   left_eye_zbasis[3] = view_mat_l.columns[2][3];
 
+  view_mat_l = gIdentityMat;
   gNewWorldMat = view_mat_l;
 
   if (gHookedSimulatedHeadset) {
@@ -361,7 +363,7 @@ void pull_openxr_data()
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
 
-    real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
+    //real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
   }
 }
 
@@ -370,12 +372,12 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
-  last_which = which;
+  printf("hook_cp_frame_query_drawable %u\n", which);
   if (!gHookedRightTexture[which]) {
     // only make this once
-    id<MTLDevice> metalDevice = MTLCreateSystemDefaultDevice();
     id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
     id<MTLTexture> originalDepthTexture = cp_drawable_get_depth_texture(retval, 0);
+    id<MTLDevice> metalDevice = originalTexture.device;//MTLCreateSystemDefaultDevice();
     
     gHookedRightTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
     gHookedRightDepthTexture[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalDepthTexture);
@@ -455,28 +457,50 @@ extern void cp_drawable_present(cp_drawable_t drawable);
 static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                                             id<MTLCommandBuffer> command_buffer) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
+  last_which = which;
   if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3) {
-    [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
+    id<MTLCommandQueue> queue = command_buffer.commandQueue;
+    id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
+
+    printf("hook_cp_drawable_encode_present %u\n", which);
+
+    id<MTLBlitCommandEncoder> blit = [blit_cmd_buffer blitCommandEncoder];
+    [blit copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
+    [blit endEncoding];
+
+    /*id<MTLBlitCommandEncoder> blit2 = [blit_cmd_buffer blitCommandEncoder];
+    [blit2 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
+    [blit2 endEncoding];
+
+    id<MTLBlitCommandEncoder> blit3 = [blit_cmd_buffer blitCommandEncoder];
+    [blit3 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
+    [blit3 endEncoding];*/
+
+    //if (which == 1)
+    {
+      id<MTLBlitCommandEncoder> blitL = [blit_cmd_buffer blitCommandEncoder];
+      [blitL copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedLeftTextureCopy[which]];
+      [blitL endEncoding];
+
+      id<MTLBlitCommandEncoder> blitR = [blit_cmd_buffer blitCommandEncoder];
+      [blitR copyFromTexture:gHookedRightTexture[which] toTexture:gHookedRightTextureCopy[which]];
+      [blitR endEncoding];
+    }
+    
+
+    [blit_cmd_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
       openxr_complete_renderframe(which);
+    }];
+
+  
+    [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
+      [blit_cmd_buffer commit];
     }];
   }
 
-  id<MTLBlitCommandEncoder> blit = [command_buffer blitCommandEncoder];
-  [blit copyFromTexture:gHookedLeftTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture[which].width, gHookedLeftTexture[which].height, 1) toTexture:gHookedSimulatorPreviewTexture[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
-  [blit generateMipmapsForTexture:gHookedSimulatorPreviewTexture[which]];
-  [blit endEncoding];
-
-  id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
-  [blitL copyFromTexture:gHookedLeftTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedLeftTexture[which].width, gHookedLeftTexture[which].height, 1) toTexture:gHookedLeftTextureCopy[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
-  [blitL generateMipmapsForTexture:gHookedLeftTextureCopy[which]];
-  [blitL endEncoding];
-
-  id<MTLBlitCommandEncoder> blitR = [command_buffer blitCommandEncoder];
-  [blitR copyFromTexture:gHookedRightTexture[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(gHookedRightTexture[which].width, gHookedRightTexture[which].height, 1) toTexture:gHookedRightTextureCopy[which] destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
-  [blitR generateMipmapsForTexture:gHookedRightTextureCopy[which]];
-  [blitR endEncoding];
-
   cp_drawable_encode_present(drawable, command_buffer);
+
+  //[command_buffer commit];
   //cp_drawable_present(drawable);
 }
 
@@ -516,10 +540,11 @@ DYLD_INTERPOSE(hook_cp_drawable_get_texture_count, cp_drawable_get_texture_count
 
 static id<MTLTexture> hook_cp_drawable_get_color_texture(cp_drawable_t drawable, size_t index) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
+  printf("hook_cp_drawable_get_color_texture(%u) %u\n", index, which);
   if (index == 1) {
     return gHookedRightTexture[which];
   }
-  else if (index == 2) {
+  else if (index == 2 || index == 0) {
     return gHookedLeftTexture[which];
   }
   return cp_drawable_get_color_texture(drawable, 0);
@@ -529,10 +554,11 @@ DYLD_INTERPOSE(hook_cp_drawable_get_color_texture, cp_drawable_get_color_texture
 
 static id<MTLTexture> hook_cp_drawable_get_depth_texture(cp_drawable_t drawable, size_t index) {
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
+  printf("hook_cp_drawable_get_depth_texture(%u) %u\n", index, which);
   if (index == 1) {
     return gHookedRightDepthTexture[which];
   }
-  else if (index == 2) {
+  else if (index == 2 || index == 0) {
     return gHookedLeftDepthTexture[which];
   }
   return cp_drawable_get_depth_texture(drawable, 0);
@@ -633,18 +659,6 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   //printf("get eye pos %u, %f %f %f %f\n", forEye, pose->position[0], pose->position[1], pose->position[2], pose->position[3]);
 }
 
-static void (*real_RSSimulatedHeadset_getPose)(RSSimulatedHeadset* self, SEL sel,
-                                                  struct RSSimulatedHeadsetPose* pose, double time);
-static void hook_RSSimulatedHeadset_getPose(RSSimulatedHeadset* self, SEL sel,
-                                               struct RSSimulatedHeadsetPose* pose, double time) {
-  real_RSSimulatedHeadset_getPose(self, sel, pose, time);
-  
-  pull_openxr_data();
-
-  pose->position = left_eye_pos;
-  pose->rotation = left_eye_quat;
-}
-
 static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL sel,
                                                   struct RSSimulatedHeadsetPose pose, int forEye);
 static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel,
@@ -673,7 +687,6 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
 
 static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose) {
-
   pose.position = left_eye_pos;
   pose.rotation = left_eye_quat;
 
@@ -683,6 +696,20 @@ static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel
   real_RSSimulatedHeadset_setHMDPose(self, sel, pose);
   
   //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
+}
+
+static void (*real_RSSimulatedHeadset_getPose)(RSSimulatedHeadset* self, SEL sel,
+                                                  struct RSSimulatedHeadsetPose* pose, double time);
+static void hook_RSSimulatedHeadset_getPose(RSSimulatedHeadset* self, SEL sel,
+                                               struct RSSimulatedHeadsetPose* pose, double time) {
+  real_RSSimulatedHeadset_getPose(self, sel, pose, time);
+  
+  pull_openxr_data();
+
+  pose->position = left_eye_pos;
+  pose->rotation = left_eye_quat;
+
+  real_RSSimulatedHeadset_setHMDPose(self, sel, *pose);
 }
 
 __attribute__((constructor)) static void SetupSignalHandler() {

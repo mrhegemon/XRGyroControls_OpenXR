@@ -114,7 +114,7 @@ void createImage(const Context* context, uint32_t width, uint32_t height, VkForm
   vkBindImageMemory(vkDevice, image, imageMemory, 0);
 }
 
-void createImageFromMetal(const Context* context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, MTLTexture_id tex_id) {
+void createImageFromMetal(const Context* context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, MTLTexture_id tex_id) {
   const VkDevice vkDevice = context->getVkDevice();
 
   VkImageCreateInfo imageInfo{};
@@ -143,20 +143,6 @@ void createImageFromMetal(const Context* context, uint32_t width, uint32_t heigh
   if (vkCreateImage(vkDevice, &imageInfo, nullptr, &image) != VK_SUCCESS) {
     throw std::runtime_error("failed to create image!");
   }
-
-  VkMemoryRequirements memRequirements;
-  vkGetImageMemoryRequirements(vkDevice, image, &memRequirements);
-
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = findMemoryType(context, memRequirements.memoryTypeBits, properties);
-
-  if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate image memory!");
-  }
-
-  vkBindImageMemory(vkDevice, image, imageMemory, 0);
 }
 
 VkCommandBuffer Renderer::beginSingleTimeCommands(const Context* context) {
@@ -266,245 +252,16 @@ void Renderer::copyBufferToImage(const Context* context, VkBuffer buffer, VkImag
     endSingleTimeCommands(context, commandBuffer);
 }
 
-void Renderer::createTextureImage_L(const Context* context, int which) {
-  const VkDevice vkDevice = context->getVkDevice();
-
-  int texWidth = 32;
-  int texHeight = 32;
-  int texChannels = 4;
-  VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-  VkBuffer stagingBuffer;
-  VkDeviceMemory stagingBufferMemory;
-  createBuffer(context, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-  void* data;
-  vkMapMemory(vkDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    unsigned char* data_as_u8 = static_cast<unsigned char*>(data);
-    for (int i = 0; i < texWidth * texHeight; i++)
-    {
-      for (int j = 0; j < 4; j++)
-      {
-        unsigned char val = 0;
-        if (j == 3) val = 0xFF;
-        if (j == 0) val = i & 0xFF;
-
-        if (i & 1 && j != 3) val = 0x0;
-
-        data_as_u8[(i*4)+j] = val;
-      }
-    }
-  vkUnmapMemory(vkDevice, stagingBufferMemory);
-
-  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], textureImageMemory_L[which]);
-
-  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_L[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-  vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-  vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
-}
-
 void Renderer::createTextureImageHax_L(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
-  int texWidth = metal_tex_w;
-  int texHeight = metal_tex_h;
-  int texChannels = 4;
-  VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-  VkBuffer stagingBuffer;
-  VkDeviceMemory stagingBufferMemory;
-  createBuffer(context, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-  void* data;
-  vkMapMemory(vkDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    unsigned char* data_as_u8 = static_cast<unsigned char*>(data);
-    for (int i = 0; i < texWidth * texHeight; i++)
-    {
-      for (int j = 0; j < 4; j++)
-      {
-        unsigned char val = 0;
-        if (j == 3) val = 0xFF;
-        if (j == 0) val = i & 0xFF;
-
-        if (i & 1 && j != 3) val = 0x0;
-
-        data_as_u8[(i*4)+j] = val;
-      }
-    }
-  vkUnmapMemory(vkDevice, stagingBufferMemory);
-
-  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], textureImageMemory_L[which], metal_tex_l[which]);
-
-  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_L[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-  vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-  vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
-}
-
-void Renderer::createTextureImage_R(const Context* context, int which) {
-  const VkDevice vkDevice = context->getVkDevice();
-
-  int texWidth = metal_tex_w;
-  int texHeight = metal_tex_h;
-  int texChannels = 4;
-  VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-  VkBuffer stagingBuffer;
-  VkDeviceMemory stagingBufferMemory;
-  createBuffer(context, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-  void* data;
-  vkMapMemory(vkDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    unsigned char* data_as_u8 = static_cast<unsigned char*>(data);
-    for (int i = 0; i < texWidth * texHeight; i++)
-    {
-      for (int j = 0; j < 4; j++)
-      {
-        unsigned char val = 0;
-        if (j == 3) val = 0xFF;
-        if (j == 1) val = i & 0xFF;
-
-        if (i & 1 && j != 3) val = 0x0;
-
-        data_as_u8[(i*4)+j] = val;
-      }
-    }
-  vkUnmapMemory(vkDevice, stagingBufferMemory);
-
-  createImage(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], textureImageMemory_R[which]);
-
-  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_R[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-  vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-  vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
+  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_L[which], metal_tex_l[which]);
 }
 
 void Renderer::createTextureImageHax_R(const Context* context, int which) {
   const VkDevice vkDevice = context->getVkDevice();
 
-  int texWidth = 32;
-  int texHeight = 32;
-  int texChannels = 4;
-  VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-  VkBuffer stagingBuffer;
-  VkDeviceMemory stagingBufferMemory;
-  createBuffer(context, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-  void* data;
-  vkMapMemory(vkDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    unsigned char* data_as_u8 = static_cast<unsigned char*>(data);
-    for (int i = 0; i < texWidth * texHeight; i++)
-    {
-      for (int j = 0; j < 4; j++)
-      {
-        unsigned char val = 0;
-        if (j == 3) val = 0xFF;
-        if (j == 1) val = i & 0xFF;
-
-        if (i & 1 && j != 3) val = 0x0;
-
-        data_as_u8[(i*4)+j] = val;
-      }
-    }
-  vkUnmapMemory(vkDevice, stagingBufferMemory);
-
-  createImageFromMetal(context, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], textureImageMemory_R[which], metal_tex_r[which]);
-
-  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(context, stagingBuffer, textureImage_R[which], static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-  transitionImageLayout(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-  vkDestroyBuffer(vkDevice, stagingBuffer, nullptr);
-  vkFreeMemory(vkDevice, stagingBufferMemory, nullptr);
-}
-
-VkImageView createImageView(const Context* context, VkImage image, VkFormat format) {
-  const VkDevice vkDevice = context->getVkDevice();
-  VkImageViewCreateInfo viewInfo{};
-  viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image = image;
-  viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format = format;
-  viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = 1;
-  viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount = 1;
-
-  VkImageView imageView;
-  if (vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create texture image view!");
-  }
-
-  return imageView;
-}
-
-void Renderer::createTextureImageView_L(const Context* context, int which) {
-    textureImageView_L[which] = createImageView(context, textureImage_L[which], VK_FORMAT_R8G8B8A8_SRGB);
-}
-
-void Renderer::createTextureImageView_R(const Context* context, int which) {
-    textureImageView_R[which] = createImageView(context, textureImage_R[which], VK_FORMAT_R8G8B8A8_SRGB);
-}
-
-void Renderer::createTextureSampler_L(const Context* context, int which) {
-  const VkDevice vkDevice = context->getVkDevice();
-  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
-  VkPhysicalDeviceProperties properties{};
-  vkGetPhysicalDeviceProperties(vkPhysicalDevice, &properties);
-
-  VkSamplerCreateInfo samplerInfo{};
-  samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerInfo.magFilter = VK_FILTER_LINEAR;
-  samplerInfo.minFilter = VK_FILTER_LINEAR;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.anisotropyEnable = VK_TRUE;
-  samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-  samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-  samplerInfo.unnormalizedCoordinates = VK_FALSE;
-  samplerInfo.compareEnable = VK_FALSE;
-  samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-  samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_L[which]) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture sampler!");
-  }
-}
-
-void Renderer::createTextureSampler_R(const Context* context, int which) {
-  const VkDevice vkDevice = context->getVkDevice();
-  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
-  VkPhysicalDeviceProperties properties{};
-  vkGetPhysicalDeviceProperties(vkPhysicalDevice, &properties);
-
-  VkSamplerCreateInfo samplerInfo{};
-  samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerInfo.magFilter = VK_FILTER_LINEAR;
-  samplerInfo.minFilter = VK_FILTER_LINEAR;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.anisotropyEnable = VK_TRUE;
-  samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-  samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-  samplerInfo.unnormalizedCoordinates = VK_FALSE;
-  samplerInfo.compareEnable = VK_FALSE;
-  samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-  samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-  if (vkCreateSampler(vkDevice, &samplerInfo, nullptr, &textureSampler_R[which]) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture sampler!");
-  }
+  createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], metal_tex_r[which]);
 }
 
 Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
@@ -534,227 +291,33 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
   for (int i = 0; i < 3; i++)
   {
     createTextureImageHax_L(context,i);
-    createTextureImageView_L(context,i);
-    createTextureSampler_L(context,i);
 
     createTextureImageHax_R(context,i);
-    createTextureImageView_R(context,i);
-    createTextureSampler_R(context,i);
-  }
-  
-  std::array<VkDescriptorPoolSize, 3> poolSizes{};
-  poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSizes[0].descriptorCount = static_cast<uint32_t>(numFramesInFlight);
-  poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  poolSizes[1].descriptorCount = static_cast<uint32_t>(numFramesInFlight);
-  poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  poolSizes[2].descriptorCount = static_cast<uint32_t>(numFramesInFlight);
-
-  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-  descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
-  descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(numFramesInFlight);
-  if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
-  }
-
-  // Create a descriptor set layout
-  VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
-  descriptorSetLayoutBinding.binding = 0u;
-  descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorSetLayoutBinding.descriptorCount = 1u;
-  descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-  VkDescriptorSetLayoutBinding samplerLayoutBinding_L{};
-  samplerLayoutBinding_L.binding = 1u;
-  samplerLayoutBinding_L.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  samplerLayoutBinding_L.descriptorCount = 1u;
-  samplerLayoutBinding_L.pImmutableSamplers = nullptr;
-  samplerLayoutBinding_L.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  VkDescriptorSetLayoutBinding samplerLayoutBinding_R{};
-  samplerLayoutBinding_R.binding = 2u;
-  samplerLayoutBinding_R.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  samplerLayoutBinding_R.descriptorCount = 1u;
-  samplerLayoutBinding_R.pImmutableSamplers = nullptr;
-  samplerLayoutBinding_R.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  std::array<VkDescriptorSetLayoutBinding, 3> bindings = {descriptorSetLayoutBinding, samplerLayoutBinding_L, samplerLayoutBinding_R};
-
-  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-  descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-  descriptorSetLayoutCreateInfo.pBindings = bindings.data();
-  if (vkCreateDescriptorSetLayout(vkDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) !=
-      VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
-  }
-
-  // Create a pipeline layout
-  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-  pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
-  pipelineLayoutCreateInfo.setLayoutCount = 1u;
-  if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
   }
 
   // Create a render process for each frame in flight
+  int which = 0;
   renderProcesses.resize(numFramesInFlight);
   for (RenderProcess*& renderProcess : renderProcesses)
   {
-    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout, textureImageView_L[0], textureSampler_L[0], textureImageView_R[0], textureSampler_R[0]);
+    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool);
     if (!renderProcess->isValid())
     {
       valid = false;
       return;
     }
   }
-
-  // Create the rect pipeline
-  VkVertexInputBindingDescription vertexInputBindingDescription;
-  vertexInputBindingDescription.binding = 0u;
-  vertexInputBindingDescription.stride = sizeof(Vertex);
-  vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-  VkVertexInputAttributeDescription vertexInputAttributeDescriptionPosition;
-  vertexInputAttributeDescriptionPosition.binding = 0u;
-  vertexInputAttributeDescriptionPosition.location = 0u;
-  vertexInputAttributeDescriptionPosition.format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescriptionPosition.offset = offsetof(Vertex, position);
-
-  VkVertexInputAttributeDescription vertexInputAttributeDescriptionColor;
-  vertexInputAttributeDescriptionColor.binding = 0u;
-  vertexInputAttributeDescriptionColor.location = 1u;
-  vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
-
-  VkVertexInputAttributeDescription vertexInputAttributeDescriptionUV;
-  vertexInputAttributeDescriptionUV.binding = 0u;
-  vertexInputAttributeDescriptionUV.location = 2u;
-  vertexInputAttributeDescriptionUV.format = VK_FORMAT_R32G32_SFLOAT;
-  vertexInputAttributeDescriptionUV.offset = offsetof(Vertex, uv);
-
-  char tmp1[1024];
-  char tmp2[1024];
-
-  snprintf(tmp1, sizeof(tmp1), "%s/shaders/Basic.vert.spv", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
-  tmp1[sizeof(tmp1)-1] = 0;
-
-  snprintf(tmp2, sizeof(tmp2), "%s/shaders/Rect.frag.spv", getenv("XRHAX_ROOTDIR") ? getenv("XRHAX_ROOTDIR") : ".");
-  tmp2[sizeof(tmp2)-1] = 0;
-
-  // Create the rect pipeline
-  rectPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), tmp1,
-                              tmp2, { vertexInputBindingDescription },
-                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor, vertexInputAttributeDescriptionUV });
-  if (!rectPipeline->isValid())
-  {
-    valid = false;
-    return;
-  }
-
-  // Create a vertex buffer
-  {
-    // Create a staging buffer and fill it with the vertex data
-    constexpr size_t size = sizeof(vertices);
-    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
-    if (!stagingBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Create an empty target buffer
-    vertexBuffer =
-      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
-    if (!vertexBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*vertexBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
-    {
-      valid = false;
-      return;
-    }
-
-    // Clean up the staging buffer
-    delete stagingBuffer;
-  }
-
-  // Create an index buffer
-  {
-    // Create a staging buffer and fill it with the index data
-    constexpr size_t size = sizeof(indices);
-    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(indices.data()));
-    if (!stagingBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Create an empty target buffer
-    indexBuffer =
-      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
-    if (!indexBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*indexBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
-    {
-      valid = false;
-      return;
-    }
-
-    // Clean up the staging buffer
-    delete stagingBuffer;
-  }
 }
 
 Renderer::~Renderer()
 {
-  delete indexBuffer;
-  delete vertexBuffer;
-  delete rectPipeline;
-
   const VkDevice vkDevice = context->getVkDevice();
 
   for (int i = 0; i < 3; i++)
   {
-    vkDestroySampler(vkDevice, textureSampler_L[i], nullptr);
-    vkDestroyImageView(vkDevice, textureImageView_L[i], nullptr);
     vkDestroyImage(vkDevice, textureImage_L[i], nullptr);
-    vkFreeMemory(vkDevice, textureImageMemory_L[i], nullptr);
-
-    vkDestroySampler(vkDevice, textureSampler_R[i], nullptr);
-    vkDestroyImageView(vkDevice, textureImageView_R[i], nullptr);
     vkDestroyImage(vkDevice, textureImage_R[i], nullptr);
-    vkFreeMemory(vkDevice, textureImageMemory_R[i], nullptr);
   }
-  
-  vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
-  vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
-  vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
 
   for (const RenderProcess* renderProcess : renderProcesses)
   {
@@ -768,8 +331,8 @@ void Renderer::render(size_t swapchainImageIndex, int which)
 {
   currentRenderProcessIndex = (currentRenderProcessIndex + 1u) % renderProcesses.size();
 
+  //which = 0;
   RenderProcess* renderProcess = renderProcesses.at(currentRenderProcessIndex);
-  renderProcess->UpdateImages(textureImageView_L[which], textureSampler_L[which], textureImageView_R[which], textureSampler_R[which]);
 
   const VkFence busyFence = renderProcess->getBusyFence();
   if (vkResetFences(context->getVkDevice(), 1u, &busyFence) != VK_SUCCESS)
@@ -790,83 +353,55 @@ void Renderer::render(size_t swapchainImageIndex, int which)
     return;
   }
 
-  // Update the uniform buffer data
-  float handScaleAll1 = 0.1;
-  float handScaleAll2 = 0.01;
-  glm::vec3 handScale1 = glm::vec3(handScaleAll1 * (1.0 / 2.0), handScaleAll1 * (1.0 / 2.0), handScaleAll1 * (1.0 / 2.0));
-  glm::vec3 handScale2 = glm::vec3(handScaleAll2 * (1.0 / 2.0), handScaleAll2 * (1.0 / 2.0), handScaleAll2 * (1.0 / 2.0));
+  // Do a 32x32 blit to all of the dst image - should get big squares
+  VkImageBlit region_l;
+  region_l.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region_l.srcSubresource.mipLevel = 0;
+  region_l.srcSubresource.baseArrayLayer = 0;
+  region_l.srcSubresource.layerCount = 1;
+  region_l.srcOffsets[0].x = 0;
+  region_l.srcOffsets[0].y = 0;
+  region_l.srcOffsets[0].z = 0;
+  region_l.srcOffsets[1].x = metal_tex_w;
+  region_l.srcOffsets[1].y = metal_tex_h;
+  region_l.srcOffsets[1].z = 1;
+  region_l.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region_l.dstSubresource.mipLevel = 0;
+  region_l.dstSubresource.baseArrayLayer = 0;
+  region_l.dstSubresource.layerCount = 1;
+  region_l.dstOffsets[0].x = 0;
+  region_l.dstOffsets[0].y = 0;
+  region_l.dstOffsets[0].z = 0;
+  region_l.dstOffsets[1].x = headset->getRenderTarget(swapchainImageIndex)->w;
+  region_l.dstOffsets[1].y = headset->getRenderTarget(swapchainImageIndex)->h;
+  region_l.dstOffsets[1].z = 1;
 
+  VkImageBlit region_r;
+  region_r.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region_r.srcSubresource.mipLevel = 0;
+  region_r.srcSubresource.baseArrayLayer = 0;
+  region_r.srcSubresource.layerCount = 1;
+  region_r.srcOffsets[0].x = 0;
+  region_r.srcOffsets[0].y = 0;
+  region_r.srcOffsets[0].z = 0;
+  region_r.srcOffsets[1].x = metal_tex_w;
+  region_r.srcOffsets[1].y = metal_tex_h;
+  region_r.srcOffsets[1].z = 1;
+  region_r.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region_r.dstSubresource.mipLevel = 0;
+  region_r.dstSubresource.baseArrayLayer = 1;
+  region_r.dstSubresource.layerCount = 1;
+  region_r.dstOffsets[0].x = 0;
+  region_r.dstOffsets[0].y = 0;
+  region_r.dstOffsets[0].z = 0;
+  region_r.dstOffsets[1].x = headset->getRenderTarget(swapchainImageIndex)->w;
+  region_r.dstOffsets[1].y = headset->getRenderTarget(swapchainImageIndex)->h;
+  region_r.dstOffsets[1].z = 1;
 
-  /*for (int i = 0; i < 64; i++)
-  {
-    glm::mat4 trans1 = glm::translate(glm::mat4(1.0f), { 0.0f, -1.4f/2.0, 2.0f });
-    glm::mat4 scale1 = glm::scale(glm::mat4(1.0f), i < 2 ? handScale1 : handScale2);
-    glm::mat4 trans2_l = glm::translate(glm::mat4(1.0f), { headset->tracked_locations[i].pose.position.x, headset->tracked_locations[i].pose.position.y, headset->tracked_locations[i].pose.position.z });
-    glm::quat rot_l_q = glm::quat(headset->tracked_locations[i].pose.orientation.w, headset->tracked_locations[i].pose.orientation.x, headset->tracked_locations[i].pose.orientation.y, headset->tracked_locations[i].pose.orientation.z);
-    glm::mat4 rot_l = glm::toMat4(rot_l_q);
-    glm::mat4 realMat_l = trans2_l * rot_l * scale1 * trans1;
-
-    renderProcess->uniformBufferData.tracked_points[i] = realMat_l;
-  }*/
-
-  renderProcess->uniformBufferData.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
-  for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
-  {
-    renderProcess->uniformBufferData.viewProjection[eyeIndex] =
-      headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
-  }
-
-  if (!renderProcess->updateUniformBufferData())
-  {
-    return;
-  }
-
-  const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
-
-  VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-  renderPassBeginInfo.renderPass = headset->getRenderPass();
-  renderPassBeginInfo.framebuffer = headset->getRenderTarget(swapchainImageIndex)->getFramebuffer();
-  renderPassBeginInfo.renderArea.offset = { 0, 0 };
-  renderPassBeginInfo.renderArea.extent = headset->getEyeResolution(0u);
-  renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-  renderPassBeginInfo.pClearValues = clearValues.data();
-
-  vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-  // Set the viewport
-  VkViewport viewport;
-  viewport.x = static_cast<float>(renderPassBeginInfo.renderArea.offset.x);
-  viewport.y = static_cast<float>(renderPassBeginInfo.renderArea.offset.y);
-  viewport.width = static_cast<float>(renderPassBeginInfo.renderArea.extent.width);
-  viewport.height = static_cast<float>(renderPassBeginInfo.renderArea.extent.height);
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-  vkCmdSetViewport(commandBuffer, 0u, 1u, &viewport);
-
-  // Set the scissor
-  VkRect2D scissor;
-  scissor.offset = renderPassBeginInfo.renderArea.offset;
-  scissor.extent = renderPassBeginInfo.renderArea.extent;
-  vkCmdSetScissor(commandBuffer, 0u, 1u, &scissor);
-
-  // Bind the vertex buffer
-  const VkDeviceSize offset = 0u;
-  const VkBuffer buffer = vertexBuffer->getVkBuffer();
-  vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
-
-  // Bind the index buffer
-  vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getVkBuffer(), 0u, VK_INDEX_TYPE_UINT16);
-
-  // Bind the uniform buffer
-  const VkDescriptorSet descriptorSet = renderProcess->getDescriptorSet();
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
-                          nullptr);
-
-  // Draw the rect
-  rectPipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
-
-  vkCmdEndRenderPass(commandBuffer);
+  vkCmdBlitImage(commandBuffer, textureImage_L[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &region_l, VK_FILTER_LINEAR);
+  vkCmdBlitImage(commandBuffer, textureImage_R[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &region_r, VK_FILTER_LINEAR);
 }
 
 void Renderer::submit(bool useSemaphores) const

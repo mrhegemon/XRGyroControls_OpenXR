@@ -18,6 +18,8 @@ public:
   VkImage getImage() const;
   VkFramebuffer getFramebuffer() const;
 
+  int w, h;
+
 private:
   bool valid = true;
 
