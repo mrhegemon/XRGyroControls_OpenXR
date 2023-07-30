@@ -1086,7 +1086,7 @@ void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
 
   // Wait for the swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
-  swapchainImageWaitInfo.timeout = 1000000000;
+  swapchainImageWaitInfo.timeout = 1000000;
   result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
