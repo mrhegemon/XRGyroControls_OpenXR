@@ -20,7 +20,7 @@ class RenderTarget;
 #define HAND_LEFT_INDEX (0)
 #define HAND_RIGHT_INDEX (1)
 #define HAND_COUNT (2)
-#define STORED_POSE_COUNT (6)
+#define STORED_POSE_COUNT (20)
 
 class Headset final
 {
@@ -37,7 +37,9 @@ public:
     SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(int* pPoseIdx);
+  void redoBeginFrame();
   void beginFrameRender(uint32_t& swapchainImageIndex);
+  void endRender(int poseIdx) const;
   void endFrame(int poseIdx) const;
 
   bool isValid() const;

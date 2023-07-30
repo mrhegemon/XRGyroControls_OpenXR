@@ -704,6 +704,19 @@ Headset::~Headset()
   vkDestroyRenderPass(vkDevice, renderPass, nullptr);
 }
 
+void Headset::redoBeginFrame()
+{
+  // Begin the new frame
+  XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
+  XrResult result = xrBeginFrame(session, &frameBeginInfo);
+  if (XR_FAILED(result))
+  {
+    util::error(Error::GenericOpenXR);
+    return;// BeginFrameResult::Error;
+  }
+  
+}
+
 Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 {
   const XrInstance instance = context->getXrInstance();
@@ -773,11 +786,22 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
     return BeginFrameResult::Error;
   }
 
+  
+  // Begin the new frame
+  XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
+  result = xrBeginFrame(session, &frameBeginInfo);
+  if (XR_FAILED(result))
+  {
+    util::error(Error::GenericOpenXR);
+    return BeginFrameResult::Error;
+  }
+  
+
   if (!pOut->frameState.shouldRender)
   {
     // Let the host know that we don't want to render this frame
     // We do still need to end the frame however
-    //return BeginFrameResult::SkipRender;
+    return BeginFrameResult::SkipRender;
   }
 
   //std::lock_guard<std::mutex> guard(eyePoseMutex);
@@ -1040,14 +1064,16 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 
 void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
 {
-  // Begin the new frame
+  XrResult result;
+  /*// Begin the new frame
   XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
-  XrResult result = xrBeginFrame(session, &frameBeginInfo);
+  result = xrBeginFrame(session, &frameBeginInfo);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
     return; //BeginFrameResult::Error;
-  }
+  }*/
+
 
   // Acquire the swapchain image
   XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
@@ -1060,7 +1086,7 @@ void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
 
   // Wait for the swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
-  swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
+  swapchainImageWaitInfo.timeout = 1000000000;
   result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
@@ -1069,7 +1095,7 @@ void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
   }
 }
 
-void Headset::endFrame(int poseIdx) const
+void Headset::endRender(int poseIdx) const
 {
   // Release the swapchain image
   XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
@@ -1078,7 +1104,10 @@ void Headset::endFrame(int poseIdx) const
   {
     return;
   }
+}
 
+void Headset::endFrame(int poseIdx) const
+{
   // End the frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
   compositionLayerProjection.space = space;
@@ -1099,7 +1128,7 @@ void Headset::endFrame(int poseIdx) const
   frameEndInfo.layerCount = static_cast<uint32_t>(layers.size());
   frameEndInfo.layers = layers.data();
   frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-  result = xrEndFrame(session, &frameEndInfo);
+  XrResult result = xrEndFrame(session, &frameEndInfo);
   if (XR_FAILED(result))
   {
     return;

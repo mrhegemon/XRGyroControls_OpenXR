@@ -278,7 +278,7 @@ void pull_openxr_data()
 {
   int which_guess = (last_which + 1) % 3;
 
-  printf("%u pull_openxr_data(%u)\n", which_guess, pulled_which == which_guess);
+  //printf("%u pull_openxr_data(%u)\n", which_guess, pulled_which == which_guess);
 
   if (pulled_which == which_guess) {
     return;
@@ -288,7 +288,7 @@ void pull_openxr_data()
   memset(&xr_data[which_guess], 0, sizeof(xr_data[which_guess]));
   if (num_buffers_collected() >= 3)
   {
-    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
+    openxr_set_textures(&gHookedLeftTexture, &gHookedRightTexture, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
 
     // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
     poseIdxs[which_guess] = openxr_headset_get_data(&xr_data[which_guess], which_guess);
@@ -376,7 +376,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
   openxr_headset_data* pData = &xr_data[which];
-  printf("%u hook_cp_frame_query_drawable (idx %u)\n", which, poseIdxs[which]);
+  //printf("%u hook_cp_frame_query_drawable (idx %u)\n", which, poseIdxs[which]);
   if (!gHookedRightTexture[which]) {
     // only make this once
     id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
@@ -491,7 +491,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
     //id<MTLCommandQueue> queue = command_buffer.commandQueue;
     //id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
 
-    printf("%u hook_cp_drawable_encode_present\n", which);
+    //printf("%u hook_cp_drawable_encode_present\n", which);
 
 #if 0
     // Optimize the texture for CPU access by encoding a blit command.
@@ -531,7 +531,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
     [blit3 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
     [blit3 endEncoding];*/
 
-#if 1
+#if 0
     //if (which == 1)
     {
       id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
@@ -559,7 +559,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
 
   
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      copyDoneL[which].signaledValue += 1;
+      //copyDoneL[which].signaledValue += 1;
       //printf("got signal for %u %u\n", which, copyDoneL[which].signaledValue);
       /*
       size_t textureDataSize = gHookedLeftTexture[which].width * 4;

@@ -20,9 +20,15 @@
 #include <semaphore>
 #include "Util.h"
 
-int frame_started = 0;
+int xr_begin_frame_valid = 0;
+int last_rendered_idx = 0;
+int pose_data_valid = 0;
 std::mutex renderMutex[3];
 std::mutex renderMutex2;
+std::mutex poseLatchMutex;
+std::mutex endFrameMutex;
+std::binary_semaphore beginFrameSem(0);
+std::binary_semaphore poseRequestedSem(0);
 std::mutex dataMutex[3];
 std::binary_semaphore xrosRenderDone[3] = {std::binary_semaphore(0),std::binary_semaphore(0),std::binary_semaphore(0)}; 
 
@@ -120,8 +126,10 @@ Context* context = nullptr;
 Headset* headset = nullptr;
 Renderer* renderer = nullptr;
 int openxr_is_done = 0;
-std::thread* render_thread;
+std::thread* pose_thread;
 void* shm_addr;
+
+int current_pose_idx = 0;
 
  std::chrono::time_point<std::chrono::high_resolution_clock> last_loop;
 
@@ -138,6 +146,43 @@ extern "C" int openxr_main()
   return 0;
 }
 
+extern "C" int pose_fetch_loop()
+{
+  int new_idx = 0;
+  while(1)
+  {
+    //printf("pose fetch endframe wait\n");
+    endFrameMutex.lock();
+    //printf("pose fetch endframe get\n");
+    Headset::BeginFrameResult frameResult = headset->beginFrame(&new_idx);
+    //printf("pose fetch got frame\n");
+    if (frameResult == Headset::BeginFrameResult::RenderFully)
+    {
+      xr_begin_frame_valid = 1;
+      beginFrameSem.release();
+    }
+    else if (frameResult == Headset::BeginFrameResult::SkipRender)
+    {
+      headset->endFrame(new_idx);
+    }
+    endFrameMutex.unlock();
+    
+    //printf("pose fetch latch wait\n");
+    poseLatchMutex.lock();
+    //printf("pose fetch latch get\n");
+    if (frameResult == Headset::BeginFrameResult::RenderFully)
+    {
+      current_pose_idx = new_idx;
+      pose_data_valid = 1;
+    }
+    poseLatchMutex.unlock();
+
+    //poseRequestedSem.acquire();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
 extern "C" int openxr_init()
 {
   setlinebuf(stdout);
@@ -146,7 +191,7 @@ extern "C" int openxr_init()
   stderr->_write = stderr_redirect_nslog;
   //setenv("XR_RUNTIME_JSON", "/Users/maxamillion/workspace/XRGyroControls_OpenXR_2/openxr_monado-dev.json", 1);
 
-  frame_started = 0;
+  //frame_started = 0;
   /*for (int i = 0; i < 3; i++)
   {
     renderMutex2[i].lock();
@@ -212,7 +257,7 @@ extern "C" int openxr_init()
 
   printf("XRHax: OpenXR init success!\n");
 
-  //render_thread = new std::thread(render_loop);
+  pose_thread = new std::thread(pose_fetch_loop);
 
   return EXIT_SUCCESS;
 }
@@ -247,7 +292,6 @@ extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_
 
 uint32_t swapchainImageIndex[3] = {0,0,0};
 
-Headset::BeginFrameResult frameResult;
 extern "C" int openxr_full_loop(int which, int poseIdx)
 {
   if (!context || !context->isValid()) {
@@ -262,6 +306,9 @@ extern "C" int openxr_full_loop(int which, int poseIdx)
     openxr_is_done = 1;
     return 1;
   }
+
+  //printf("%u wait renderMutex2 (idx %u)\n", which, poseIdx);
+  renderMutex2.lock();
 
   //renderMutex.lock();
 
@@ -280,22 +327,78 @@ extern "C" int openxr_full_loop(int which, int poseIdx)
     last_loop = std::chrono::high_resolution_clock::now();
   }
 
-  printf("%u wait render\n", which);
-  renderMutex2.lock();
-  printf("%u render\n", which);
+  //printf("%u wait render (idx %u)\n", which, poseIdx);
+  
+  int acquired = 0;
+  for (int i = 0; i < 100; i++) {
+    if(beginFrameSem.try_acquire()) {
+      acquired = 1;
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  if (!acquired) {
+    printf("%u failed to acquire (idx %u)\n", which, poseIdx);
+    renderMutex2.unlock();
+
+    //poseRequestedSem.release(); // kick the pose thread
+
+    return 0;
+  }
+  //poseLatchMutex.lock();
+  
+#if 0
+  if (!xr_begin_frame_valid) {
+    /*poseLatchMutex.unlock();
+    //headset->redoBeginFrame();
+    while (!xr_begin_frame_valid) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    poseLatchMutex.lock();*/
+    poseLatchMutex.unlock();
+    renderMutex2.unlock();
+    return 0;
+  }
+#endif
+
+  /*if (last_rendered_idx == poseIdx) {
+    poseLatchMutex.unlock();
+    renderMutex2.unlock();
+    return 0;
+  }*/
+  last_rendered_idx = poseIdx;
+
+  
   //xrosRenderDone[which].acquire();
+
+  //printf("%u wait endFrameMutex (idx %u)\n", which, poseIdx);
+  endFrameMutex.lock();
+
+  // possible race condition
+  if (!xr_begin_frame_valid) {
+    endFrameMutex.unlock();
+    renderMutex2.unlock();
+    return 0;
+  }
+  //printf("%u render (idx %u)\n", which, poseIdx);
   headset->beginFrameRender(swapchainImageIndex[which]);
+  //printf("%u render beginframe done (idx %u)\n", which, poseIdx);
   renderer->render(swapchainImageIndex[which], which);
+  //printf("%u render render done (idx %u)\n", which, poseIdx);
   //renderer->render(swapchainImageIndex[which], which);
   //printf("submit %u\n", which);
   renderer->submit(false, which);
+  //printf("%u render submit done (idx %u)\n", which, poseIdx);
+  headset->endRender(poseIdx);
+  //printf("%u render endRender done (idx %u)\n", which, poseIdx);
   headset->endFrame(poseIdx);
-  renderMutex2.unlock();
-  //printf("XRHax: OpenXR loop done\n");
+  //printf("%u render endframe done (idx %u)\n", which, poseIdx);
 
-  //context->sync(); // Sync before destroying so that resources are free
-  //renderMutex[0].unlock();
-  //printf("releasing lock\n");
+  xr_begin_frame_valid = 0;
+  endFrameMutex.unlock();
+  //printf("%u render done (idx %u)\n", which, poseIdx);
+
+  renderMutex2.unlock();
 
   return 0;
 }
@@ -305,6 +408,7 @@ extern "C" void openxr_spawn_renderframe(int which, int poseIdx)
   //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
   std::thread(openxr_full_loop, which, poseIdx).detach();
+  //openxr_full_loop(which, poseIdx);
 #if 0
   for (int i = 0; i < 40000; i++)
   {
@@ -364,11 +468,19 @@ extern "C" int openxr_headset_get_data(openxr_headset_data* out, int which)
 
   //dataMutex[which].lock();
 
-  int poseIdx = 0;
-  frameResult = headset->beginFrame(&poseIdx);
-  PoseData* pPose = &headset->storedPoses[poseIdx];
+  //poseRequestedSem.release();
 
-  printf("%u get data (idx %u)\n", which, poseIdx);
+  while (!pose_data_valid) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  //printf("%u wait data\n", which);
+  poseLatchMutex.lock();
+  int poseIdx = current_pose_idx;
+  PoseData* pPose = &headset->storedPoses[current_pose_idx];
+  poseLatchMutex.unlock();
+  
+  //printf("%u get data (idx %u)\n", which, poseIdx);
   //printf("pulling headset data for %u, idx %u\n", which, poseIdx);
 
   glm::mat4 ctrl_l = util::poseToMatrix(pPose->tracked_locations[0].pose);
