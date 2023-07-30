@@ -38,15 +38,13 @@ public:
   };
   BeginFrameResult beginFrame(int* pPoseIdx);
   void beginFrameRender(uint32_t& swapchainImageIndex);
-  void endFrame() const;
+  void endFrame(int poseIdx) const;
 
   bool isValid() const;
   bool isExitRequested() const;
   VkRenderPass getRenderPass() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
-  glm::mat4 getEyeViewMatrix(size_t eyeIndex) const;
-  glm::mat4 getEyeProjectionMatrix(size_t eyeIndex) const;
   RenderTarget* getRenderTarget(size_t swapchainImageIndex) const;
 
   XrActionSet gameplay_actionset;
@@ -82,11 +80,8 @@ private:
   XrSession session = nullptr;
   XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
   XrSpace space = nullptr;
-  XrFrameState frameState = {};
-  XrViewState viewState = {};
 
   std::vector<XrViewConfigurationView> eyeImageInfos;
-  std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
 
   XrSwapchain swapchain = nullptr;
   std::vector<RenderTarget*> swapchainRenderTargets;

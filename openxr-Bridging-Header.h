@@ -50,12 +50,12 @@ typedef void* MTLSharedEvent_id;
 #endif
 
 int openxr_main();
-int openxr_full_loop(int which);
-void openxr_spawn_renderframe(int which);
-void openxr_complete_renderframe(int which);
+int openxr_full_loop(int which, int poseIdx);
+void openxr_spawn_renderframe(int which, int poseIdx);
+void openxr_complete_renderframe(int which, int poseIdx);
 int openxr_cleanup();
 int openxr_done();
-void openxr_headset_get_data(openxr_headset_data* out, int which);
+int openxr_headset_get_data(openxr_headset_data* out, int which);
 int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, MTLSharedEvent_id* paEvent_l, uint32_t w, uint32_t h);
 
 #ifdef __cplusplus

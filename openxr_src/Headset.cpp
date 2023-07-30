@@ -358,23 +358,6 @@ Headset::Headset(const Context* context) : context(context)
     }
   }
 
-  // Create the eye render infos
-  eyeRenderInfos.resize(eyeCount);
-  for (size_t eyeIndex = 0u; eyeIndex < eyeRenderInfos.size(); ++eyeIndex)
-  {
-    XrCompositionLayerProjectionView& eyeRenderInfo = eyeRenderInfos.at(eyeIndex);
-    eyeRenderInfo.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-    eyeRenderInfo.next = nullptr;
-
-    // Associate this eye with the swapchain
-    const XrViewConfigurationView& eyeImageInfo = eyeImageInfos.at(eyeIndex);
-    eyeRenderInfo.subImage.swapchain = swapchain;
-    eyeRenderInfo.subImage.imageArrayIndex = static_cast<uint32_t>(eyeIndex);
-    eyeRenderInfo.subImage.imageRect.offset = { 0, 0 };
-    eyeRenderInfo.subImage.imageRect.extent = { static_cast<int32_t>(eyeImageInfo.recommendedImageRectWidth),
-                                                static_cast<int32_t>(eyeImageInfo.recommendedImageRectHeight) };
-  }
-
   // Actions
   // --- Set up input (actions)
 
@@ -650,6 +633,23 @@ Headset::Headset(const Context* context) : context(context)
   {
     PoseData* p = &storedPoses[i];
 
+    // Create the eye render infos
+    p->eyeRenderInfos.resize(eyeCount);
+    for (size_t eyeIndex = 0u; eyeIndex < p->eyeRenderInfos.size(); ++eyeIndex)
+    {
+      XrCompositionLayerProjectionView& eyeRenderInfo = p->eyeRenderInfos.at(eyeIndex);
+      eyeRenderInfo.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+      eyeRenderInfo.next = nullptr;
+
+      // Associate this eye with the swapchain
+      const XrViewConfigurationView& eyeImageInfo = eyeImageInfos.at(eyeIndex);
+      eyeRenderInfo.subImage.swapchain = swapchain;
+      eyeRenderInfo.subImage.imageArrayIndex = static_cast<uint32_t>(eyeIndex);
+      eyeRenderInfo.subImage.imageRect.offset = { 0, 0 };
+      eyeRenderInfo.subImage.imageRect.extent = { static_cast<int32_t>(eyeImageInfo.recommendedImageRectWidth),
+                                                  static_cast<int32_t>(eyeImageInfo.recommendedImageRectHeight) };
+    }
+
     // Allocate the eye poses
     p->eyePoses.resize(eyeCount);
     for (XrView& eyePose : p->eyePoses)
@@ -708,6 +708,7 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 {
   const XrInstance instance = context->getXrInstance();
   int curPoseIdx = (lastPoseIdx + 1) % STORED_POSE_COUNT;
+  lastPoseIdx = curPoseIdx;
   PoseData* pOut = &storedPoses[curPoseIdx];
 
   if (pPoseIdx) {
@@ -763,25 +764,16 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
   }
 
   // Wait for the new frame
-  frameState.type = XR_TYPE_FRAME_STATE;
+  pOut->frameState.type = XR_TYPE_FRAME_STATE;
   XrFrameWaitInfo frameWaitInfo{ XR_TYPE_FRAME_WAIT_INFO };
-  XrResult result = xrWaitFrame(session, &frameWaitInfo, &frameState);
+  XrResult result = xrWaitFrame(session, &frameWaitInfo, &pOut->frameState);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
-  // Begin the new frame
-  XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
-  result = xrBeginFrame(session, &frameBeginInfo);
-  if (XR_FAILED(result))
-  {
-    util::error(Error::GenericOpenXR);
-    return BeginFrameResult::Error;
-  }
-
-  if (!frameState.shouldRender)
+  if (!pOut->frameState.shouldRender)
   {
     // Let the host know that we don't want to render this frame
     // We do still need to end the frame however
@@ -791,13 +783,13 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
   //std::lock_guard<std::mutex> guard(eyePoseMutex);
 
   // Update the eye poses
-  viewState.type = XR_TYPE_VIEW_STATE;
+  pOut->viewState.type = XR_TYPE_VIEW_STATE;
   uint32_t viewCount;
   XrViewLocateInfo viewLocateInfo{ XR_TYPE_VIEW_LOCATE_INFO };
   viewLocateInfo.viewConfigurationType = context->getXrViewType();
-  viewLocateInfo.displayTime = frameState.predictedDisplayTime;
+  viewLocateInfo.displayTime = pOut->frameState.predictedDisplayTime;
   viewLocateInfo.space = space;
-  result = xrLocateViews(session, &viewLocateInfo, &viewState, static_cast<uint32_t>(pOut->eyePoses.size()), &viewCount,
+  result = xrLocateViews(session, &viewLocateInfo, &pOut->viewState, static_cast<uint32_t>(pOut->eyePoses.size()), &viewCount,
                          pOut->eyePoses.data());
   if (XR_FAILED(result))
   {
@@ -815,7 +807,7 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
   for (size_t eyeIndex = 0u; eyeIndex < eyeCount; ++eyeIndex)
   {
     // Copy the eye poses into the eye render infos
-    XrCompositionLayerProjectionView& eyeRenderInfo = eyeRenderInfos.at(eyeIndex);
+    XrCompositionLayerProjectionView& eyeRenderInfo = pOut->eyeRenderInfos.at(eyeIndex);
     const XrView& eyePose = pOut->eyePoses.at(eyeIndex);
     eyeRenderInfo.pose = eyePose.pose;
     eyeRenderInfo.fov = eyePose.fov;
@@ -878,7 +870,7 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
     pOut->tracked_locations[i].type = XR_TYPE_SPACE_LOCATION;
     pOut->tracked_locations[i].next = NULL;
 
-    result = xrLocateSpace(hand_pose_spaces[i], space, frameState.predictedDisplayTime,
+    result = xrLocateSpace(hand_pose_spaces[i], space, pOut->frameState.predictedDisplayTime,
                            &pOut->tracked_locations[i]);
     //xr_check(instance, result, "failed to locate space %d!", i);
 
@@ -966,7 +958,7 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 
   XrHandJointsLocateInfoEXT locateInfo{XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT};
   locateInfo.baseSpace = space;
-  locateInfo.time = frameState.predictedDisplayTime;
+  locateInfo.time = pOut->frameState.predictedDisplayTime;
 
   if (left_hand_valid)
     context->xrLocateHandJointsEXT(leftHandTracker, &locateInfo, &pOut->leftLocations);
@@ -1048,9 +1040,18 @@ Headset::BeginFrameResult Headset::beginFrame(int* pPoseIdx)
 
 void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
 {
+  // Begin the new frame
+  XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
+  XrResult result = xrBeginFrame(session, &frameBeginInfo);
+  if (XR_FAILED(result))
+  {
+    util::error(Error::GenericOpenXR);
+    return; //BeginFrameResult::Error;
+  }
+
   // Acquire the swapchain image
   XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-  XrResult result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
+  result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
@@ -1068,7 +1069,7 @@ void Headset::beginFrameRender(uint32_t& swapchainImageIndex)
   }
 }
 
-void Headset::endFrame() const
+void Headset::endFrame(int poseIdx) const
 {
   // Release the swapchain image
   XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
@@ -1081,20 +1082,20 @@ void Headset::endFrame() const
   // End the frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
   compositionLayerProjection.space = space;
-  compositionLayerProjection.viewCount = static_cast<uint32_t>(eyeRenderInfos.size());
-  compositionLayerProjection.views = eyeRenderInfos.data();
+  compositionLayerProjection.viewCount = static_cast<uint32_t>(storedPoses[poseIdx].eyeRenderInfos.size());
+  compositionLayerProjection.views = storedPoses[poseIdx].eyeRenderInfos.data();
 
   std::vector<XrCompositionLayerBaseHeader*> layers;
 
-  const bool positionValid = viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
-  const bool orientationValid = viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
-  if (frameState.shouldRender && positionValid && orientationValid)
+  const bool positionValid = storedPoses[poseIdx].viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
+  const bool orientationValid = storedPoses[poseIdx].viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
+  if (storedPoses[poseIdx].frameState.shouldRender && positionValid && orientationValid)
   {
     layers.push_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&compositionLayerProjection));
   }
 
   XrFrameEndInfo frameEndInfo{ XR_TYPE_FRAME_END_INFO };
-  frameEndInfo.displayTime = frameState.predictedDisplayTime;
+  frameEndInfo.displayTime = storedPoses[poseIdx].frameState.predictedDisplayTime;
   frameEndInfo.layerCount = static_cast<uint32_t>(layers.size());
   frameEndInfo.layers = layers.data();
   frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;

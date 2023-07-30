@@ -35,18 +35,18 @@ static simd_float4x4 gNewWorldMat = {.columns = {
                                             {0, 2.0, 0, 1},
                                         }};
 
-static simd_float4x4 left_controller_pose;
-static simd_float4x4 right_controller_pose;
+static simd_float4x4 left_controller_pose[3];
+static simd_float4x4 right_controller_pose[3];
 
-simd_float4x4 view_mat_l;
-simd_float4x4 view_mat_r;
-openxr_headset_data xr_data;
+simd_float4x4 view_mat_l[3];
+simd_float4x4 view_mat_r[3];
+openxr_headset_data xr_data[3];
 
-static simd_float4 left_eye_pos;
-static simd_float4 left_eye_quat;
-static simd_float4 left_eye_zbasis;
-static simd_float4 right_eye_pos;
-static simd_float4 right_eye_quat;
+static simd_float4 left_eye_pos[3];
+static simd_float4 left_eye_quat[3];
+static simd_float4 left_eye_zbasis[3];
+static simd_float4 right_eye_pos[3];
+static simd_float4 right_eye_quat[3];
 
 // cp_drawable_get_view
 struct cp_view {
@@ -115,6 +115,7 @@ static id<MTLTexture> gHookedLeftTextureCopy[3] = {nil,nil,nil};
 static id<MTLTexture> gHookedSimulatorPreviewTexture[3] = {nil,nil,nil};
 static id<MTLSharedEvent> copyDoneL[3] = {nil,nil,nil};
 static MTLSharedEventListener* copyDoneListenerL[3];
+static int poseIdxs[3] = {0,0,0};
 
 #define NUM_VIEWS (2)
 
@@ -277,68 +278,68 @@ void pull_openxr_data()
 {
   int which_guess = (last_which + 1) % 3;
 
-  //printf("pull_openxr_data %u (%u)\n", which_guess, pulled_which == which_guess);
+  printf("%u pull_openxr_data(%u)\n", which_guess, pulled_which == which_guess);
 
   if (pulled_which == which_guess) {
     return;
   }
 
   // We do this first, because query_drawable might stall...?
-  memset(&xr_data, 0, sizeof(xr_data));
+  memset(&xr_data[which_guess], 0, sizeof(xr_data[which_guess]));
   if (num_buffers_collected() >= 3)
   {
-    openxr_set_textures(&gHookedLeftTexture, &gHookedRightTexture, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
-
-    openxr_spawn_renderframe(which_guess);
+    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
 
     // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
-    openxr_headset_get_data(&xr_data, which_guess);
+    poseIdxs[which_guess] = openxr_headset_get_data(&xr_data[which_guess], which_guess);
 
     pulled_which = which_guess;
   }
+
+  openxr_headset_data* pData = &xr_data[which_guess];
 
   // Apple
   // X is -left/+right
   // Y is +up/-down
   // Z is -forward/+back
-  left_eye_pos[0] = xr_data.l_x;
-  left_eye_pos[1] = xr_data.l_y;
-  left_eye_pos[2] = xr_data.l_z;
-  left_eye_pos[3] = 0.0;
+  left_eye_pos[which_guess][0] = pData->l_x;
+  left_eye_pos[which_guess][1] = pData->l_y;
+  left_eye_pos[which_guess][2] = pData->l_z;
+  left_eye_pos[which_guess][3] = 0.0;
 
-  left_eye_quat[0] = xr_data.l_qx;
-  left_eye_quat[1] = xr_data.l_qy;
-  left_eye_quat[2] = xr_data.l_qz;
-  left_eye_quat[3] = xr_data.l_qw;
+  left_eye_quat[which_guess][0] = pData->l_qx;
+  left_eye_quat[which_guess][1] = pData->l_qy;
+  left_eye_quat[which_guess][2] = pData->l_qz;
+  left_eye_quat[which_guess][3] = pData->l_qw;
 
-  right_eye_pos[0] = xr_data.r_x;
-  right_eye_pos[1] = xr_data.r_y;
-  right_eye_pos[2] = xr_data.r_z;
-  right_eye_pos[3] = 0.0;
+  right_eye_pos[which_guess][0] = pData->r_x;
+  right_eye_pos[which_guess][1] = pData->r_y;
+  right_eye_pos[which_guess][2] = pData->r_z;
+  right_eye_pos[which_guess][3] = 0.0;
 
-  right_eye_quat[0] = xr_data.r_qx;
-  right_eye_quat[1] = xr_data.r_qy;
-  right_eye_quat[2] = xr_data.r_qz;
-  right_eye_quat[3] = xr_data.r_qw;
+  right_eye_quat[which_guess][0] = pData->r_qx;
+  right_eye_quat[which_guess][1] = pData->r_qy;
+  right_eye_quat[which_guess][2] = pData->r_qz;
+  right_eye_quat[which_guess][3] = pData->r_qw;
 
-  if (xr_data.view_l)
+  if (pData->view_l)
   {
     for (int i = 0; i < 4; i++)
     {
       for (int j = 0; j < 4; j++)
       {
-        view_mat_l.columns[i][j] = xr_data.view_l[(i*4)+j];
+        view_mat_l[which_guess].columns[i][j] = pData->view_l[(i*4)+j];
       }
     }
   }
 
-  if (xr_data.view_r)
+  if (pData->view_r)
   {
     for (int i = 0; i < 4; i++)
     {
       for (int j = 0; j < 4; j++)
       {
-        view_mat_r.columns[i][j] = xr_data.view_r_rel[(i*4)+j];
+        view_mat_r[which_guess].columns[i][j] = pData->view_r_rel[(i*4)+j];
       }
     }
   }
@@ -347,23 +348,23 @@ void pull_openxr_data()
   {
     for (int j = 0; j < 4; j++)
     {
-      left_controller_pose.columns[i][j] = xr_data.l_controller[(i*4)+j];
-      right_controller_pose.columns[i][j] = xr_data.r_controller[(i*4)+j];
+      left_controller_pose[which_guess].columns[i][j] = pData->l_controller[(i*4)+j];
+      right_controller_pose[which_guess].columns[i][j] = pData->r_controller[(i*4)+j];
     }
   }
 
-  left_eye_zbasis[0] = view_mat_l.columns[2][0];
-  left_eye_zbasis[1] = view_mat_l.columns[2][1];
-  left_eye_zbasis[2] = view_mat_l.columns[2][2];
-  left_eye_zbasis[3] = view_mat_l.columns[2][3];
+  left_eye_zbasis[which_guess][0] = view_mat_l[which_guess].columns[2][0];
+  left_eye_zbasis[which_guess][1] = view_mat_l[which_guess].columns[2][1];
+  left_eye_zbasis[which_guess][2] = view_mat_l[which_guess].columns[2][2];
+  left_eye_zbasis[which_guess][3] = view_mat_l[which_guess].columns[2][3];
 
-  view_mat_l = gIdentityMat;
-  gNewWorldMat = view_mat_l;
+  view_mat_l[which_guess] = gIdentityMat;
+  gNewWorldMat = view_mat_l[which_guess];
 
   if (gHookedSimulatedHeadset) {
     struct RSSimulatedHeadsetPose pose;
-    pose.position = left_eye_pos;
-    pose.rotation = left_eye_quat;
+    pose.position = left_eye_pos[which_guess];
+    pose.rotation = left_eye_quat[which_guess];
 
     //real_RSSimulatedHeadset_setHMDPose(gHookedSimulatedHeadset, gHookedSimulatedHeadset_sel, pose);
   }
@@ -374,7 +375,8 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
   cp_drawable_t retval = cp_frame_query_drawable(frame);
   int which = which_buffer_is_this(cp_drawable_get_color_texture(retval, 0));
-  //printf("hook_cp_frame_query_drawable %u\n", which);
+  openxr_headset_data* pData = &xr_data[which];
+  printf("%u hook_cp_frame_query_drawable (idx %u)\n", which, poseIdxs[which]);
   if (!gHookedRightTexture[which]) {
     // only make this once
     id<MTLTexture> originalTexture = cp_drawable_get_color_texture(retval, 0);
@@ -424,17 +426,17 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   simView->tangents = tangents_l;
   rightView->tangents = tangents_r;
 
-  if (xr_data.tangents_l)
+  if (pData->tangents_l)
   {
-    simd_float4 tangents_l = simd_make_float4(tanf(-xr_data.tangents_l[0]), tanf(xr_data.tangents_l[1]),
-                                              tanf(xr_data.tangents_l[2]), tanf(-xr_data.tangents_l[3]));
+    simd_float4 tangents_l = simd_make_float4(tanf(-pData->tangents_l[0]), tanf(pData->tangents_l[1]),
+                                              tanf(pData->tangents_l[2]), tanf(-pData->tangents_l[3]));
     simView->tangents = tangents_l;
   }
   
-  if (xr_data.tangents_r)
+  if (pData->tangents_r)
   {
-    simd_float4 tangents_r = simd_make_float4(tanf(-xr_data.tangents_r[0]), tanf(xr_data.tangents_r[1]),
-                                              tanf(xr_data.tangents_r[2]), tanf(-xr_data.tangents_r[3]));
+    simd_float4 tangents_r = simd_make_float4(tanf(-pData->tangents_r[0]), tanf(pData->tangents_r[1]),
+                                              tanf(pData->tangents_r[2]), tanf(-pData->tangents_r[3]));
     rightView->tangents = tangents_r;
   }
 
@@ -442,7 +444,7 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
   rightView->height_maybe = 0.0f;
 
   //simView->transform = view_mat_l;
-  rightView->transform = view_mat_r;
+  rightView->transform = view_mat_r[which];
   simView->transform = gIdentityMat;
 
   return retval;
@@ -484,10 +486,12 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
   int which = which_buffer_is_this(cp_drawable_get_color_texture(drawable, 0));
   last_which = which;
   if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3 && buffer_delay >= 1) {
+    //openxr_spawn_renderframe(which, poseIdxs[which]);
+
     //id<MTLCommandQueue> queue = command_buffer.commandQueue;
     //id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
 
-    //printf("hook_cp_drawable_encode_present %u\n", which);
+    printf("%u hook_cp_drawable_encode_present\n", which);
 
 #if 0
     // Optimize the texture for CPU access by encoding a blit command.
@@ -527,7 +531,7 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
     [blit3 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
     [blit3 endEncoding];*/
 
-#if 0
+#if 1
     //if (which == 1)
     {
       id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
@@ -578,7 +582,8 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
                   slice:0];*/
 
       //[blit_cmd_buffer commit];
-      openxr_complete_renderframe(which);
+      openxr_spawn_renderframe(which, poseIdxs[which]);
+      openxr_complete_renderframe(which, poseIdxs[which]);
     }];
   }
 
@@ -727,7 +732,7 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
                                                struct RSSimulatedHeadsetPose* pose, int forEye) {
   real_RSSimulatedHeadset_getEyePose(self, sel, pose, forEye);
   
-  if (forEye == 0)
+  /*if (forEye == 0)
   {
     pose->position = left_eye_pos;
     pose->rotation = left_eye_quat;
@@ -736,7 +741,7 @@ static void hook_RSSimulatedHeadset_getEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose->position = right_eye_pos;
     pose->rotation = right_eye_quat;
-  }
+  }*/
   /*else if (forEye == 2)
   {
     pose->position = left_eye_pos;
@@ -750,7 +755,7 @@ static void (*real_RSSimulatedHeadset_setEyePose)(RSSimulatedHeadset* self, SEL 
                                                   struct RSSimulatedHeadsetPose pose, int forEye);
 static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose, int forEye) {
-  if (forEye == 0)
+  /*if (forEye == 0)
   {
     pose.position = left_eye_pos;
     pose.rotation = left_eye_quat;
@@ -759,7 +764,7 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
   {
     pose.position = right_eye_pos;
     pose.rotation = right_eye_quat;
-  }
+  }*/
   /*else if (forEye == 2)
   {
     pose.position = left_eye_pos;
@@ -774,8 +779,8 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
 
 static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose) {
-  pose.position = left_eye_pos;
-  pose.rotation = left_eye_quat;
+  pose.position = left_eye_pos[pulled_which];
+  pose.rotation = left_eye_quat[pulled_which];
 
   gHookedSimulatedHeadset = self;
   gHookedSimulatedHeadset_sel = sel;
@@ -793,8 +798,8 @@ static void hook_RSSimulatedHeadset_getPose(RSSimulatedHeadset* self, SEL sel,
   
   pull_openxr_data();
 
-  pose->position = left_eye_pos;
-  pose->rotation = left_eye_quat;
+  pose->position = left_eye_pos[pulled_which];
+  pose->rotation = left_eye_quat[pulled_which];
 
   real_RSSimulatedHeadset_setHMDPose(self, sel, *pose);
 }

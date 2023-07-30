@@ -25,11 +25,15 @@ public:
   PoseData();
   ~PoseData();
 
+  XrViewState viewState = {};
+  XrFrameState frameState = {};
   XrActionStateFloat grab_value[HAND_COUNT];
   XrActionStateFloat grip_value[HAND_COUNT];
   XrActionStateBoolean system_value[HAND_COUNT];
   XrActionStateBoolean b_y_value[HAND_COUNT];
   XrSpaceLocation tracked_locations[64];
+
+  std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
 
   bool pinch_l;
   bool pinch_r;

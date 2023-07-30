@@ -12,7 +12,7 @@ $SIMCTL spawn booted defaults write com.apple.RealitySystemSupport EnableRecline
 
 #$SIMCTL spawn booted defaults write com.apple.RealitySimulation AllowImmersiveVirtualHands 1
 $SIMCTL spawn booted defaults write com.apple.RealitySimulation ShowCursor 1
-$SIMCTL spawn booted defaults write com.apple.RealitySimulation OverlapRenderAndSimulation 1
+$SIMCTL spawn booted defaults write com.apple.RealitySimulation OverlapRenderAndSimulation 0
 $SIMCTL spawn booted defaults write com.apple.RealitySimulation VRRLateLatching 0
 $SIMCTL spawn booted defaults write com.apple.RealitySimulation VRREnabled 0
 $SIMCTL spawn booted defaults delete com.apple.RealitySimulation OverrideRenderedContentFrameRate
