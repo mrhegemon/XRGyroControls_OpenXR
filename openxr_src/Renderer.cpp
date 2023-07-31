@@ -157,7 +157,7 @@ void Renderer::createTextureImageHax_R(const Context* context, int which) {
   createImageFromMetal(context, metal_tex_w, metal_tex_h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_R[which], metal_tex_r[which]);
 }
 
-Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, MTLSharedEvent_id* event_l, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
+Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id* tex_l, MTLTexture_id* tex_r, uint32_t tex_w, uint32_t tex_h) : context(context), headset(headset)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
@@ -165,7 +165,6 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
   {
     metal_tex_l[i] = tex_l[i];
     metal_tex_r[i] = tex_r[i];
-    metal_event_l[i] = event_l[i];
   }
   metal_tex_w = tex_w;
   metal_tex_h = tex_h;
@@ -186,23 +185,6 @@ Renderer::Renderer(const Context* context, const Headset* headset, MTLTexture_id
     createTextureImageHax_L(context,i);
 
     createTextureImageHax_R(context,i);
-
-    VkImportMetalSharedEventInfoEXT metalEventInfo = {};
-    metalEventInfo.sType = VK_STRUCTURE_TYPE_IMPORT_METAL_SHARED_EVENT_INFO_EXT;
-    metalEventInfo.pNext = NULL;
-    metalEventInfo.mtlSharedEvent = metal_event_l[i];
-
-    // Now create an event and wait for it on the GPU
-    VkEventCreateInfo eventInfo = {};
-    eventInfo.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
-    eventInfo.pNext = &metalEventInfo;
-    eventInfo.flags = 0;
-    vkCreateEvent(vkDevice, &eventInfo, NULL, &metalTexEvent[i]);
-
-    /*VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    semaphoreInfo.pNext = &metalEventInfo;
-    vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &metalTexEvent[i]);*/
   }
 
   // Create a render process for each frame in flight
@@ -308,9 +290,6 @@ void Renderer::render(size_t swapchainImageIndex, int which)
   region_r.dstOffsets[1].y = headset->getRenderTarget(swapchainImageIndex)->h;
   region_r.dstOffsets[1].z = 1;
 
-  /*vkCmdWaitEvents(commandBuffer, 1, &metalTexEvent[which], VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, nullptr, 0, nullptr,
-                    0, nullptr);*/
-
   vkCmdBlitImage(commandBuffer, textureImage_L[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    1, &region_l, VK_FILTER_LINEAR);
   vkCmdBlitImage(commandBuffer, textureImage_R[which], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, headset->getRenderTarget(swapchainImageIndex)->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -335,9 +314,6 @@ void Renderer::submit(bool useSemaphores, int which) const
   submitInfo.pWaitDstStageMask = &waitStages;
   submitInfo.commandBufferCount = 1u;
   submitInfo.pCommandBuffers = &commandBuffer;
-
-  //submitInfo.waitSemaphoreCount = 1u;
-  //submitInfo.pWaitSemaphores = &metalTexEvent[which];
 
   if (useSemaphores)
   {

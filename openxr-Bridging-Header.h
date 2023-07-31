@@ -56,7 +56,7 @@ void openxr_complete_renderframe(int which, int poseIdx);
 int openxr_cleanup();
 int openxr_done();
 int openxr_headset_get_data(openxr_headset_data* out, int which);
-int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, MTLSharedEvent_id* paEvent_l, uint32_t w, uint32_t h);
+int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, uint32_t w, uint32_t h);
 
 #ifdef __cplusplus
 }

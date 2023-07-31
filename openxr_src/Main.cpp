@@ -118,7 +118,6 @@ int libusb_test_main(void)
 }
 }
 
-MTLSharedEvent_id* g_paEvent_l;
 MTLTexture_id* g_paTex_l;
 MTLTexture_id* g_paTex_r;
 uint32_t g_tex_w = 0;
@@ -257,7 +256,7 @@ extern "C" int openxr_init()
 
   printf("XRHax: create Renderer!\n");
 
-  renderer = new Renderer(context, headset, g_paTex_l, g_paTex_r, g_paEvent_l, g_tex_w, g_tex_h);
+  renderer = new Renderer(context, headset, g_paTex_l, g_paTex_r, g_tex_w, g_tex_h);
   if (!renderer || !renderer->isValid())
   {
     printf("XRHax: create Renderer failed!\n");
@@ -271,11 +270,10 @@ extern "C" int openxr_init()
   return EXIT_SUCCESS;
 }
 
-extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, MTLSharedEvent_id* paEvent_l, uint32_t w, uint32_t h)
+extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_r, uint32_t w, uint32_t h)
 {
   g_paTex_l = paTex_l;
   g_paTex_r = paTex_r;
-  g_paEvent_l = paEvent_l;
   g_tex_w = w;
   g_tex_h = h;
 

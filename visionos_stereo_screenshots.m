@@ -114,7 +114,6 @@ static id<MTLTexture> gHookedLeftTextureCopy[3] = {nil,nil,nil};
 
 static id<MTLTexture> gHookedSimulatorPreviewTexture[3] = {nil,nil,nil};
 static id<MTLSharedEvent> copyDoneL[3] = {nil,nil,nil};
-static MTLSharedEventListener* copyDoneListenerL[3];
 static int poseIdxs[3] = {0,0,0};
 
 #define NUM_VIEWS (2)
@@ -288,7 +287,7 @@ void pull_openxr_data()
   memset(&xr_data[which_guess], 0, sizeof(xr_data[which_guess]));
   if (num_buffers_collected() >= 3)
   {
-    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, &copyDoneL, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
+    openxr_set_textures(&gHookedLeftTextureCopy, &gHookedRightTextureCopy, gHookedRightTexture[0].width, gHookedRightTexture[0].height);
 
     // this will wait on headset data, this pose MUST be synced with the frame send w/ xrEndFrame
     poseIdxs[which_guess] = openxr_headset_get_data(&xr_data[which_guess], which_guess);
@@ -391,10 +390,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
     gHookedRightTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
     gHookedLeftTextureCopy[which] = MakeOurTextureBasedOnTheirTexture(metalDevice, originalTexture);
     copyDoneL[which] = [metalDevice newSharedEvent];
-
-    // Shareable event listener
-    dispatch_queue_t myQueue = dispatch_queue_create("com.example.apple-samplecode.MyQueue", NULL);
-    copyDoneListenerL[which] = [[MTLSharedEventListener alloc] initWithDispatchQueue:myQueue];
   }
 
   gHookedDrawable[which] = retval;
@@ -488,101 +483,19 @@ static void hook_cp_drawable_encode_present(cp_drawable_t drawable,
   if (gHookedDrawable[which] == drawable && num_buffers_collected() >= 3 && buffer_delay >= 1) {
     openxr_spawn_renderframe(which, poseIdxs[which]);
 
-    //id<MTLCommandQueue> queue = command_buffer.commandQueue;
-    //id<MTLCommandBuffer> blit_cmd_buffer = [queue commandBuffer];
-
-    //printf("%u hook_cp_drawable_encode_present\n", which);
-
-#if 0
-    // Optimize the texture for CPU access by encoding a blit command.
-    id <MTLBlitCommandEncoder> haxEncoderL = [command_buffer blitCommandEncoder];
-    [haxEncoderL optimizeContentsForCPUAccess:gHookedLeftTexture[which]];
-    [haxEncoderL endEncoding];
-
-    // Optimize the texture for CPU access by encoding a blit command.
-    id <MTLBlitCommandEncoder> haxEncoderR = [command_buffer blitCommandEncoder];
-    [haxEncoderR optimizeContentsForCPUAccess:gHookedRightTexture[which]];
-    [haxEncoderR endEncoding];
-
-    id <MTLBlitCommandEncoder> haxEncoderL2 = [command_buffer blitCommandEncoder];
-    [haxEncoderL2 optimizeContentsForGPUAccess:gHookedLeftTexture[which]];
-    [haxEncoderL2 endEncoding];
-
-    // Optimize the texture for CPU access by encoding a blit command.
-    id <MTLBlitCommandEncoder> haxEncoderR2 = [command_buffer blitCommandEncoder];
-    [haxEncoderR2 optimizeContentsForGPUAccess:gHookedRightTexture[which]];
-    [haxEncoderR2 endEncoding];
-#endif
-
-    //[command_buffer encodeWaitForEvent:copyDoneL[which] value:0];
-
-    //[command_buffer encodeSignalEvent:copyDoneL[which] value:1];
-
     id<MTLBlitCommandEncoder> blit = [command_buffer blitCommandEncoder];
     [blit copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
-    //[blit updateFence:copyDoneL[which]];
     [blit endEncoding];
 
-    /*id<MTLBlitCommandEncoder> blit2 = [command_buffer blitCommandEncoder];
-    [blit2 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
-    [blit2 endEncoding];
+    id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
+    [blitL copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedLeftTextureCopy[which]];
+    [blitL endEncoding];
 
-    id<MTLBlitCommandEncoder> blit3 = [command_buffer blitCommandEncoder];
-    [blit3 copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedSimulatorPreviewTexture[which]];
-    [blit3 endEncoding];*/
+    id<MTLBlitCommandEncoder> blitR = [command_buffer blitCommandEncoder];
+    [blitR copyFromTexture:gHookedRightTexture[which] toTexture:gHookedRightTextureCopy[which]];
+    [blitR endEncoding];
 
-#if 1
-    //if (which == 1)
-    {
-      id<MTLBlitCommandEncoder> blitL = [command_buffer blitCommandEncoder];
-      [blitL copyFromTexture:gHookedLeftTexture[which] toTexture:gHookedLeftTextureCopy[which]];
-      [blitL endEncoding];
-
-      id<MTLBlitCommandEncoder> blitR = [command_buffer blitCommandEncoder];
-      [blitR copyFromTexture:gHookedRightTexture[which] toTexture:gHookedRightTextureCopy[which]];
-      [blitR endEncoding];
-    }
-#endif
-
-    //[command_buffer encodeSignalEvent:copyDoneL[which] value:copyDoneL[which].signaledValue + 1];
-
-    /*
-    [copyDoneL[which] notifyListener:copyDoneListenerL[which]
-                         atValue:0
-                           block:^(id<MTLSharedEvent> sharedEvent, uint64_t value) {
-        /* Do CPU work * /
-        //sharedEvent.signaledValue += 1;
-        printf("got signal for %u %u\n", which, haredEvent.signaledValue);
-        openxr_complete_renderframe(which);
-    }];
-    */
-
-  
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-      //copyDoneL[which].signaledValue += 1;
-      //printf("got signal for %u %u\n", which, copyDoneL[which].signaledValue);
-      /*
-      size_t textureDataSize = gHookedLeftTexture[which].width * 4;
-      NSMutableData* outputData = [NSMutableData dataWithLength:textureDataSize];
-      [gHookedLeftTexture[which]
-               getBytes:outputData.mutableBytes
-            bytesPerRow:gHookedLeftTexture[which].width * 4
-          bytesPerImage:textureDataSize
-             fromRegion:MTLRegionMake2D(0, 0, gHookedLeftTexture[which].width, 1)
-            mipmapLevel:0
-                  slice:0];
-
-      NSMutableData* outputData2 = [NSMutableData dataWithLength:textureDataSize];
-      [gHookedRightTexture[which]
-               getBytes:outputData2.mutableBytes
-            bytesPerRow:gHookedRightTexture[which].width * 4
-          bytesPerImage:textureDataSize
-             fromRegion:MTLRegionMake2D(0, 0, gHookedRightTexture[which].width, 1)
-            mipmapLevel:0
-                  slice:0];*/
-
-      //[blit_cmd_buffer commit];
-      //openxr_spawn_renderframe(which, poseIdxs[which]);
       openxr_complete_renderframe(which, poseIdxs[which]);
     }];
   }
