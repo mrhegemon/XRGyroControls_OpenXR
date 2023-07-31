@@ -57,15 +57,6 @@ if [ $retVal -ne 0 ]; then
     exit $retVal
 fi
 
-# Compile all the shaders
-mkdir -p shaders && cp openxr_src/shaders/* shaders/ && cd $PWD && \
-glslc --target-env=vulkan1.2 $PWD/shaders/Basic.vert -std=450core -O -o $PWD/shaders/Basic.vert.spv && \
-glslc --target-env=vulkan1.2 $PWD/shaders/Rect.frag -std=450core -O -o $PWD/shaders/Rect.frag.spv
-retVal=$?
-if [ $retVal -ne 0 ]; then
-    exit $retVal
-fi
-
 cp build/libSim2OpenXR.dylib libSim2OpenXR.dylib
 
 # Remove old sim stuff

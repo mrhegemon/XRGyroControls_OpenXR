@@ -17,9 +17,9 @@ By default, Monado's simulated headset will run in the simulator. This headset g
 ## Known Issues
 
 - visionOS 1.0 Beta 2 semitransparency is extremely flickery. Set the "Reduce transparency" setting in Settings > Accessibility > Display & Text Size.
-- The Quest Link video stream sometimes becomes juddery after sleeping the headset.
-- The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
 - The visionOS simulator window **must** be focused in order to use the Home button on controllers.
+- The gaze ray gets stuck on the left controller when it disconnects. Press Menu to reset it.
+- The Quest Link video stream sometimes becomes juddery after sleeping the headset.
 - Sometimes the visionOS simulator will fail to run after too many launches, due to a MetalSim bug? Requires an OS restart.
 
 ## Accessing the old vision sim UI again
