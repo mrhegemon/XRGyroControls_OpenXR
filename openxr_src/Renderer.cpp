@@ -351,6 +351,8 @@ void Renderer::submit(bool useSemaphores, int which) const
   {
     return;
   }
+
+  vkQueueWaitIdle(context->getVkDrawQueue());
 }
 
 bool Renderer::isValid() const

@@ -432,7 +432,7 @@ extern "C" int openxr_full_loop(int which, int poseIdx)
   endFrameMutex.unlock();
   //printf("%u render done (idx %u)\n", which, poseIdx);
 
-  //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  //std::this_thread::sleep_for(std::chrono::milliseconds(508));
   renderMutex2.unlock();
 
   return 0;
