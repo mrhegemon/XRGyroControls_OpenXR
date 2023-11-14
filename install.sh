@@ -50,6 +50,12 @@ rm -rf ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Dev
 cp -r XRGyroControls.simdeviceui ${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/UserInterface/XRGyroControls.simdeviceui
 
 # Adjust resolution
+if ! [[ -d "backup_profiles" ]]; then
+    mkdir -p backup_profiles
+    cp "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/capabilities.plist" backup_profiles/capabilities.plist
+    cp "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/profile.plist" backup_profiles/profile.plist
+fi
+
 cp new_device_plists/capabilities.plist "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/capabilities.plist"
 cp new_device_plists/profile.plist "${XCODE_BETA_PATH}/Contents/Developer/Platforms/XROS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/Apple Vision Pro.simdevicetype/Contents/Resources/profile.plist"
 
