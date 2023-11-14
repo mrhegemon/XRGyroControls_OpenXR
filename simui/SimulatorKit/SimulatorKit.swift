@@ -2,6 +2,7 @@ import Foundation
 import CoreSimulator
 
 @objc public protocol SimDeviceUserInterfacePlugin {}
+@objc public protocol SimGameControllerDelegate {}
 
 @objc public class SimDeviceLegacyHIDClient : NSObject {
     // The padding is to make sure that the offset aligns with the original, when Swift tries to do tricky optimizations

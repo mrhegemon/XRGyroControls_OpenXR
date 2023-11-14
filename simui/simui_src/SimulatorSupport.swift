@@ -5,7 +5,8 @@ import AppKit
 
 import os
 
-@objc class SimulatorSupport : NSObject, SimDeviceUserInterfacePlugin {
+@objc(SimulatorSupport)
+public class SimulatorSupport : NSObject, SimDeviceUserInterfacePlugin {
     
     private let device: SimDevice
     private let hid_client: SimDeviceLegacyHIDClient
@@ -101,4 +102,14 @@ import os
     @objc func toolbar() -> NSToolbar {
         return NSToolbar()
     }
+
+    /*
+    @objc func gameControllerValueChanged(element: NSObject) -> Int {
+        return 1;
+    }
+
+    @objc func gameControllerConnectionStateChanged(element: NSObject) -> Int {
+        return 1;
+    }
+    */
 }

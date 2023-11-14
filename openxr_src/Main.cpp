@@ -27,6 +27,7 @@ std::mutex renderMutex[3];
 std::mutex renderMutex2;
 std::mutex poseLatchMutex;
 std::mutex endFrameMutex;
+std::mutex contextInitMutex;
 std::binary_semaphore beginFrameSem(0);
 std::binary_semaphore poseRequestedSem(0);
 std::mutex dataMutex[3];
@@ -118,8 +119,10 @@ int libusb_test_main(void)
 }
 }
 
-MTLTexture_id* g_paTex_l;
-MTLTexture_id* g_paTex_r;
+MTLTexture_id dummy_tex[3];
+
+MTLTexture_id* g_paTex_l = nullptr;
+MTLTexture_id* g_paTex_r = nullptr;
 uint32_t g_tex_w = 0;
 uint32_t g_tex_h = 0;
 Context* context = nullptr;
@@ -256,6 +259,15 @@ extern "C" int openxr_init()
 
   printf("XRHax: create Renderer!\n");
 
+  if (!g_paTex_l) {
+    g_paTex_l = dummy_tex;
+    g_tex_w = 512;
+  }
+  if (!g_paTex_r) {
+    g_paTex_r = dummy_tex;
+    g_tex_h = 512;
+  }
+
   renderer = new Renderer(context, headset, g_paTex_l, g_paTex_r, g_tex_w, g_tex_h);
   if (!renderer || !renderer->isValid())
   {
@@ -277,12 +289,15 @@ extern "C" int openxr_set_textures(MTLTexture_id* paTex_l, MTLTexture_id* paTex_
   g_tex_w = w;
   g_tex_h = h;
 
+  contextInitMutex.lock();
   if (!context || !context->isValid()) {
     if(openxr_init() != EXIT_SUCCESS) {
+      contextInitMutex.unlock();
       openxr_is_done = 1;
       return 1;
     }
   }
+  contextInitMutex.unlock();
 
   if (!renderer) return 1;
 
@@ -302,12 +317,15 @@ int64_t last_display_time = 0;
 
 extern "C" int openxr_full_loop(int which, int poseIdx)
 {
+  contextInitMutex.lock();
   if (!context || !context->isValid()) {
     if(openxr_init() != EXIT_SUCCESS) {
+      contextInitMutex.unlock();
       openxr_is_done = 1;
       return 1;
     }
   }
+  contextInitMutex.unlock();
 
   // Main loop
   if (headset->isExitRequested()) {
@@ -436,8 +454,40 @@ extern "C" int openxr_full_loop(int which, int poseIdx)
   return 0;
 }
 
+int fake_loop(int which, int poseIdx)
+{
+  setlinebuf(stdout);
+  setlinebuf(stderr);
+  stdout->_write = stdout_redirect_nslog;
+  stderr->_write = stderr_redirect_nslog;
+  //printf("Fake loop\n");
+
+  //xrosRenderDone[which].acquire();
+  //while (xrosRenderDone[which].try_acquire());
+  //printf("Fake loop 2\n");
+
+  renderMutex2.lock();
+  //printf("Fake loop 3\n");
+  
+  endFrameMutex.lock();
+  //printf("Fake loop 4\n");
+  //while (beginFrameSem.try_acquire());
+
+  endFrameMutex.unlock();
+  renderMutex2.unlock();
+  //printf("Fake loop exit\n");
+}
+
 extern "C" void openxr_spawn_renderframe(int which, int poseIdx)
 {
+  contextInitMutex.lock();
+  if (!context || !context->isValid()) {
+    contextInitMutex.unlock();
+    fake_loop(which, poseIdx);
+    return;
+  }
+  contextInitMutex.unlock();
+  
   //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
   std::thread(openxr_full_loop, which, poseIdx).detach();
@@ -460,6 +510,11 @@ extern "C" void openxr_spawn_renderframe(int which, int poseIdx)
 
 extern "C" void openxr_complete_renderframe(int which, int poseIdx)
 {
+  contextInitMutex.lock();
+  if (!context || !context->isValid()) {
+    //return;
+  }
+  contextInitMutex.unlock();
   //printf("frame completed (%u %u), unlocking\n", which, poseIdx);
   //renderMutex2[which].unlock();
   xrosRenderDone[which].release();
@@ -531,18 +586,18 @@ extern "C" int openxr_headset_get_data(openxr_headset_data* out, int which)
   if (!offsets_set) {
     offset_x = eyePose0.pose.position.x;
     //offset_y = /*eyePose0.pose.position.y +*/ 0.2;
-    offset_y = 1.22;
+    offset_y = 1.5;
     offset_z = eyePose0.pose.position.z - 0.5;
     offsets_set = true;
   }
 
   if (pPose->grab_value[0].currentState > 0.5) {
-      offset_y = 2.22;
-      printf("Down!\n");
+      //offset_y = 2.22;
+      //printf("Down!\n");
   }
   else {
     //printf("Not down!\n");
-    offset_y = 1.22;
+    offset_y = 1.5;
   }
 
   out->l_x  = eyePose0.pose.position.x - offset_x;

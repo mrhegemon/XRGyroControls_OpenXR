@@ -6,14 +6,16 @@ fi
 
 SIMCTL=${XCODE_BETA_PATH}/Contents/Developer/usr/bin/simctl
 
-UDID="unknown UDID, pls fix"
+UDID="unknown UDID, pls fix run.sh"
 devices=$($SIMCTL list --json devices available)
-if [[ "$devices" == *"72C8208F-E181-4AA4-B9CC-036B379BA1E7"* ]]; then
-    UDID="72C8208F-E181-4AA4-B9CC-036B379BA1E7"
+if [[ "$devices" == *"488C8280-E96E-42F2-8DD3-D036DEB5F70D"* ]]; then
+    UDID="488C8280-E96E-42F2-8DD3-D036DEB5F70D"
 fi
 if [[ "$devices" == *"7AC39665-1CAD-4FC5-BEB6-4C6269BB71BF"* ]]; then
     UDID="7AC39665-1CAD-4FC5-BEB6-4C6269BB71BF"
 fi
+
+echo "Using:" $UDID
 
 $SIMCTL shutdown $UDID
 pkill -9 Simulator

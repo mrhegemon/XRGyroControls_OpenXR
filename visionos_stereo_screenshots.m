@@ -230,12 +230,6 @@ void hook_RERenderManagerWaitForFramePacing(void* ctx)
 DYLD_INTERPOSE(hook_RERenderManagerWaitForFramePacing, RERenderManagerWaitForFramePacing);
 #endif
 
-extern int cp_layer_get_state(void* a);
-static int hook_cp_layer_get_state(void* a)
-{
-  return cp_layer_get_state(a);
-}
-DYLD_INTERPOSE(hook_cp_layer_get_state, cp_layer_get_state);
 
 int num_buffers_collected()
 {
@@ -277,8 +271,6 @@ void pull_openxr_data()
 {
   int which_guess = (last_which + 1) % 3;
 
-  //printf("%u pull_openxr_data(%u)\n", which_guess, pulled_which == which_guess);
-
   if (pulled_which == which_guess) {
     return;
   }
@@ -294,6 +286,7 @@ void pull_openxr_data()
 
     pulled_which = which_guess;
   }
+  //printf("%u pull_openxr_data(%u)\n", which_guess, pulled_which == which_guess);
 
   openxr_headset_data* pData = &xr_data[which_guess];
 
@@ -447,24 +440,6 @@ static cp_drawable_t hook_cp_frame_query_drawable(cp_frame_t frame) {
 
 DYLD_INTERPOSE(hook_cp_frame_query_drawable, cp_frame_query_drawable);
 
-extern void RERenderFrameWorkloadCommitAndWait(void* a);
-extern void RERenderFrameWorkloadCommit(void* a);
-
-void hook_RERenderFrameWorkloadCommitAndWait(void* a)
-{
-  RERenderFrameWorkloadCommitAndWait(a);
-  //openxr_complete_renderframe(last_which);
-}
-
-void hook_RERenderFrameWorkloadCommit(void* a)
-{
-  RERenderFrameWorkloadCommit(a);
-  //openxr_complete_renderframe(last_which);
-}
-
-DYLD_INTERPOSE(hook_RERenderFrameWorkloadCommitAndWait, RERenderFrameWorkloadCommitAndWait);
-DYLD_INTERPOSE(hook_RERenderFrameWorkloadCommit, RERenderFrameWorkloadCommit);
-
 #if 0
 extern void* RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c);
 void* hook_RERenderFrameSettingsAddGpuWaitEvent(void* a, void* b, void* c)
@@ -571,13 +546,14 @@ static id<MTLTexture> hook_cp_drawable_get_depth_texture(cp_drawable_t drawable,
 
 DYLD_INTERPOSE(hook_cp_drawable_get_depth_texture, cp_drawable_get_depth_texture);
 
-size_t cp_layer_properties_get_view_count(cp_layer_renderer_properties_t properties);
+size_t cp_layer_renderer_properties_get_view_count(cp_layer_renderer_properties_t properties);
 
-static size_t hook_cp_layer_properties_get_view_count(cp_layer_renderer_properties_t properties) {
+static size_t hook_cp_layer_renderer_properties_get_view_count(cp_layer_renderer_properties_t properties) {
   return NUM_VIEWS;
 }
 
-DYLD_INTERPOSE(hook_cp_layer_properties_get_view_count, cp_layer_properties_get_view_count);
+DYLD_INTERPOSE(hook_cp_layer_renderer_properties_get_view_count, cp_layer_renderer_properties_get_view_count);
+
 
 #if 0
 void RERenderFrameSettingsSetTotalTime(void* re, float time);
@@ -692,15 +668,19 @@ static void hook_RSSimulatedHeadset_setEyePose(RSSimulatedHeadset* self, SEL sel
 
 static void hook_RSSimulatedHeadset_setHMDPose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose pose) {
-  pose.position = left_eye_pos[pulled_which];
-  pose.rotation = left_eye_quat[pulled_which];
+  //pose.position = left_eye_pos[pulled_which];
+  //pose.rotation = left_eye_quat[pulled_which];
 
   gHookedSimulatedHeadset = self;
   gHookedSimulatedHeadset_sel = sel;
 
+  pull_openxr_data();
+  pose.position = left_eye_pos[pulled_which];
+  pose.rotation = left_eye_quat[pulled_which];
+
   real_RSSimulatedHeadset_setHMDPose(self, sel, pose);
   
-  //printf("set eye pos %u, %f %f %f %f\n", forEye, pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
+  //printf("set hmd pos %f %f %f %f\n", pose.position[0], pose.position[1], pose.position[2], pose.position[3]);
 }
 
 static void (*real_RSSimulatedHeadset_getPose)(RSSimulatedHeadset* self, SEL sel,
@@ -708,8 +688,9 @@ static void (*real_RSSimulatedHeadset_getPose)(RSSimulatedHeadset* self, SEL sel
 static void hook_RSSimulatedHeadset_getPose(RSSimulatedHeadset* self, SEL sel,
                                                struct RSSimulatedHeadsetPose* pose, double time) {
   real_RSSimulatedHeadset_getPose(self, sel, pose, time);
-  
-  pull_openxr_data();
+
+  //pull_openxr_data();
+  //printf("RSSimulatedHeadset_getPose\n");
 
   pose->position = left_eye_pos[pulled_which];
   pose->rotation = left_eye_quat[pulled_which];
